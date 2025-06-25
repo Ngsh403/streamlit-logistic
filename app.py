@@ -272,9 +272,9 @@ def init_db():
                 if config['type'] == 'number':
                     sql_type = "REAL"
                 elif config['type'] == 'date':
-                    sql_type = "TEXT" # YYYY-MM-DD
+                    sql_type = "TEXT" # (%Y-%m-%d)
                 elif config['type'] == 'datetime':
-                    sql_type = "TEXT" # YYYY-MM-DD HH:MM:SS.ffffff
+                    sql_type = "TEXT" # (%Y-%m-%d HH:MM:SS.ffffff)
                 elif config['type'] == 'checkbox':
                     sql_type = "INTEGER" # 0 or 1
                 
@@ -418,9 +418,9 @@ def add_db_document(company_id, collection_name, data):
     processed_data = {}
     for k, v in data.items():
         if isinstance(v, datetime.date):
-            processed_data[k] = v.isoformat() # YYYY-MM-DD
+            processed_data[k] = v.isoformat() # (%Y-%m-%d)
         elif isinstance(v, datetime.datetime):
-            processed_data[k] = v.isoformat(sep=' ') # YYYY-MM-DD HH:MM:SS.ffffff
+            processed_data[k] = v.isoformat(sep=' ') # (%Y-%m-%d HH:MM:SS.ffffff)
         elif isinstance(v, bool):
             processed_data[k] = 1 if v else 0
         elif pd.isna(v): # Handle pandas NaNs
@@ -2109,15 +2109,16 @@ def main_app():
                                 if update_db_document(selected_company_id_for_modules, 'payslips', row_doc_id, cleaned_edited_data):
                                     updated_payslip_count += 1
             
-            if updated_payslip_count > 0 or deleted_payslip_count > 0 or added_payslip_count > 0:
-                if updated_payslip_count > 0:
-                    st.success(f"{updated_payslip_count} Payslip entries updated successfully!")
-                if deleted_payslip_count > 0:
-                    st.success(f"{deleted_payslip_count} Payslip entries deleted successfully!")
-                if added_payslip_count > 0:
-                    st.success(f"{added_payslip_count} new Payslip entries added successfully!")
-                st.rerun()
+                    if updated_payslip_count > 0 or deleted_payslip_count > 0 or added_payslip_count > 0:
+                        if updated_payslip_count > 0:
+                            st.success(f"{updated_payslip_count} Payslip entries updated successfully!")
+                        if deleted_payslip_count > 0:
+                            st.success(f"{deleted_payslip_count} Payslip entries deleted successfully!")
+                        if added_payslip_count > 0:
+                            st.success(f"{added_payslip_count} new Payslip entries added successfully!")
+                        st.rerun()
 
+                    # Corrected indentation for the download section
                     st.subheader(f"Download Payslip Reports for {selected_company_name_for_modules}")
                     col1, col2 = st.columns(2)
                     with col1:
@@ -2372,6 +2373,7 @@ def main_app():
                     st.success(f"{added_payslip_count} new Payslip entries added successfully!")
                 st.rerun()
 
+            # Corrected indentation for the download section
             st.subheader("Download Payslip Reports")
             col1, col2 = st.columns(2)
             with col1:
