@@ -1,3 +1,5 @@
+
+
 import streamlit as st
 import pandas as pd
 import bcrypt
@@ -6,204 +8,45 @@ from fpdf import FPDF
 import datetime
 import plotly.express as px
 import plotly.graph_objects as go
-from num2words import num2words
-import sqlite3
-import uuid
+import json # Import json for parsing the firebase config string
+from num2words import num2words # Import for converting numbers to words for invoice amounts
 
-# --- Configuration for Company Authentication and Details ---
+# --- Firebase Admin SDK Imports ---
+import firebase_admin
+from firebase_admin import credentials
+from firebase_admin import firestore
 
-# INITIAL_USER_DB_STRUCTURE: Used for initial user setup and authentication.
-# This structure defines companies and their associated users and roles.
+# --- Configuration (unchanged, will be used for in-memory user management) ---
 INITIAL_USER_DB_STRUCTURE = {
-    "east_concord_wll": {
-        "company_name": "EAST CONCORD W.L.L",
-        "company_pin": "EAST", # Simplified PIN for login
-        "users": {
-            "east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
-            "east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
-        }
-    },
-    "sa_concord_international": {
+    "S.A. CONCORD INTERNATIONAL CARGO HANDLING CO W.L.L": {
         "company_name": "S.A. CONCORD INTERNATIONAL CARGO HANDLING CO W.L.L",
-        "company_pin": "SA",
+        "company_pin": "S.A. CONCORD INTERNATIONAL CARGO HANDLING CO W.L.L",
         "users": {
-            "sa": {"password_hash": bcrypt.hashpw("sa123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "sa": {"password_hash": bcrypt.hashpw("pass123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "sa": {"password_hash": bcrypt.hashpw("pass123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
         }
     },
-    "north_concord_cargo": {
-        "company_name": "NORTH CONCORD CARGO HANDLING CO W.L.L",
-        "company_pin": "NORTH",
+    "NORTH CONCORD CARGO HANDLING CO W.L.L": {
+        "company_name":  "NORTH CONCORD CARGO HANDLING CO W.L.L",
+        "company_pin": "NORTH CONCORD CARGO HANDLING CO W.L.L",
         "users": {
-            "north": {"password_hash": bcrypt.hashpw("north123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "north": {"password_hash": bcrypt.hashpw("pass123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
         }
     },
-    "management_company": {
-        "company_name": "Global Management",
-        "company_pin": "ADMIN", # Special PIN for admin access
+    "EAST CONCORD W.L.L": {
+        "company_name": "EAST CONCORD W.L.L",
+        "company_pin": "EAST CONCORD W.L.L",
+        "users": {
+            "east": {"password_hash": bcrypt.hashpw("pass123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+        }
+    },
+    "COMPANY MANAGEMENT": {
+        "company_name": "Company Management",
+        "company_pin": "ADMIN",
         "users": {
             "admin": {"password_hash": bcrypt.hashpw("adminpass".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "admin"},
         }
     }
-}
-
-# COMPANY_PROFILES: Used for populating detailed company information in PDFs,
-# especially for the Tax Invoice, mirroring actual letterhead details.
-COMPANY_PROFILES = {
-    "EAST CONCORD W.L.L": {
-        "name": "EAST CONCORD W.L.L",
-        "trn": "2200221799400002", # Example TRN from bill background.PNG
-        "address_line1": "Flat/Shop No. 11, Building 471",
-        "address_line2": "Road/Shop 3513, MANAMA",
-        "city_country": "UMM AL-HASSAM, Kingdom of Bahrain",
-        "email": "concord@email.com", # Example email
-        "phone": "Tel: 17228646 | Mob: 39884260, 339660641" # Example numbers
-    },
-    "S.A. CONCORD INTERNATIONAL CARGO HANDLING CO W.L.L": {
-        "name": "S.A. CONCORD INTERNATIONAL CARGO HANDLING CO W.L.L",
-        "trn": "TRN_SA_CONCORD_123", # Placeholder TRN
-        "address_line1": "S.A. Concord International Office 1",
-        "address_line2": "Building XYZ, Road ABC",
-        "city_country": "Bahrain City, Kingdom of Bahrain",
-        "email": "sa.concord@email.com",
-        "phone": "Tel: 11223344 | Mob: 55667788"
-    },
-    "NORTH CONCORD CARGO HANDLING CO W.L.L": {
-        "name": "NORTH CONCORD CARGO HANDLING CO W.L.L",
-        "trn": "TRN_NORTH_CONCORD_456", # Placeholder TRN
-        "address_line1": "North Concord Cargo Building 10",
-        "address_line2": "Street 101, Block 202",
-        "city_country": "Manama, Kingdom of Bahrain",
-        "email": "north.concord@email.com",
-        "phone": "Tel: 99887766 | Mob: 44332211"
-    }
-}
-
-
-# --- Specific Module Field Configurations ---
-TRIP_MANAGEMENT_FIELDS = {
-    'Trip Type': {'type': 'select', 'options': ['Per Trip', 'Daily', 'Monthly']},
-    'Vehicle Type': {'type': 'select', 'options': ['Open', 'Box', 'Chiller', 'Frozen', 'Chiller Van', 'Passenger Van', 'Others']},
-    'Pickup Address': {'type': 'text'},
-    'Delivery Address': {'type': 'text'},
-    'Client': {'type': 'text'},
-    'Vehicle': {'type': 'text'},
-    'Assigned Driver': {'type': 'text'},
-    'Trip Category': {'type': 'select', 'options': ['Frozen', 'Dry', 'Hourly']},
-    'Start Date & Time': {'type': 'datetime'},
-    'End Date & Time': {'type': 'datetime'},
-    'Status': {'type': 'select', 'options': ['Scheduled', 'Ongoing', 'Completed']},
-    'Distance': {'type': 'number'},
-    'Price': {'type': 'number'},
-    'Fuel Charge / Surcharges': {'type': 'number'},
-}
-
-RENTAL_MANAGEMENT_FIELDS = {
-    'Start Date': {'type': 'date'},
-    'End Date': {'type': 'date'},
-    'Client': {'type': 'text'},
-    'Vehicle': {'type': 'text'},
-    'Assigned Driver': {'type': 'text'},
-    'Daily/Monthly Rate': {'type': 'number'},
-    'VAT Exclusion': {'type': 'checkbox'},
-    'Fuel Included': {'type': 'checkbox'},
-    'Maintenance Notes': {'type': 'text'},
-    'Status': {'type': 'select', 'options': ['Active', 'Returned']},
-}
-
-FLEET_MANAGEMENT_FIELDS = {
-    'Vehicle Type': {'type': 'select', 'options': ['Open', 'Box', 'Chiller', 'Frozen', 'Chiller Van', 'Passenger Van', 'Others']},
-    'Plate No': {'type': 'text'},
-    'Type': {'type': 'text'},
-    'Capacity': {'type': 'text'},
-    'Registration Details': {'type': 'text'},
-    'Insurance Details': {'type': 'text'},
-    'Maintenance History': {'type': 'text'},
-    'Service Alerts': {'type': 'text'},
-    'Odometer Log': {'type': 'number'},
-    'Fuel Tracking': {'type': 'text'},
-    'Availability Status': {'type': 'select', 'options': ['In Use', 'Rented', 'Out of Service']},
-}
-
-INVOICING_QUOTING_FIELDS = {
-    'Date': {'type': 'date'},
-    'Particulars': {'type': 'text'},
-    'Quantity': {'type': 'number'},
-    'Rate': {'type': 'number'},
-    'Amount': {'type': 'number'},
-    'VAT (10%)': {'type': 'number'},
-    'Total Amount': {'type': 'number'},
-    'VAT Option': {'type': 'select', 'options': ['Include', 'Exclude']},
-    'Linked ID': {'type': 'text'},
-    'Remarks': {'type': 'text'},
-}
-
-CRM_MANAGEMENT_FIELDS = {
-    'Client Name': {'type': 'text'},
-    'Client Type': {'type': 'select', 'options': ['Rental', 'Logistics', 'Both']},
-    'Contact Person': {'type': 'text'},
-    'Contract Details': {'type': 'text'},
-    'Communication Log': {'type': 'text'},
-    'Payment Terms': {'type': 'text'},
-    'VAT Profile': {'type': 'text'},
-    'Credit Limit': {'type': 'number'},
-}
-
-EMPLOYEE_MANAGEMENT_FIELDS = {
-    'Name': {'type': 'text'},
-    'Designation': {'type': 'text'},
-    'Employee Type': {'type': 'select', 'options': ['Driver', 'Admin', 'Mechanic']},
-    'CPR No': {'type': 'text'},
-    'License No': {'type': 'text'},
-    'License Exp': {'type': 'date'},
-    'Passport Num': {'type': 'text'},
-    'Visa Exp': {'type': 'date'},
-    'Nationality': {'type': 'text'},
-    'Assigned Vehicle History': {'type': 'text'},
-    'Availability Status': {'type': 'select', 'options': ['On leave', 'Active']},
-    'ID/Passport/DL Uploads': {'type': 'file'},
-}
-
-PAYROLL_FIELDS = {
-    'Employee Name': {'type': 'text'},
-    'Month': {'type': 'select', 'options': [str(i) for i in range(1, 13)]},
-    'Year': {'type': 'select', 'options': [str(i) for i in range(2020, datetime.datetime.now().year + 2)]},
-    'Base Salary': {'type': 'number'},
-    'Trip Bonus': {'type': 'number'},
-    'Rental Commission': {'type': 'number'},
-    'Deductions': {'type': 'number'},
-    'Overtime': {'type': 'number'},
-    'Net Salary': {'type': 'number'}, # This would be calculated
-    'Payment Status': {'type': 'select', 'options': ['Paid', 'Unpaid']},
-}
-
-PLANNING_TIMEOFF_FIELDS = {
-    'Employee Name': {'type': 'text'},
-    'Leave Type': {'type': 'text'},
-    'Start Date': {'type': 'date'},
-    'End Date': {'type': 'date'},
-    'Status': {'type': 'select', 'options': ['Pending', 'Approved', 'Rejected']},
-}
-
-VAT_INPUT_OUTPUT_FIELDS = {
-    'Transaction Type': {'type': 'select', 'options': ['Input VAT', 'Output VAT']},
-    'Date': {'type': 'date'},
-    'Amount': {'type': 'number'},
-    'VAT Amount': {'type': 'number'},
-    'Description': {'type': 'text'},
-    'Related ID': {'type': 'text'},
-}
-
-# Populate the MODULE_FIELDS_MAP right after defining all individual field configs
-MODULE_FIELDS_MAP = {
-    'trips': TRIP_MANAGEMENT_FIELDS,
-    'rentals': RENTAL_MANAGEMENT_FIELDS,
-    'vehicles': FLEET_MANAGEMENT_FIELDS,
-    'invoices': INVOICING_QUOTING_FIELDS,
-    'clients': CRM_MANAGEMENT_FIELDS,
-    'employees': EMPLOYEE_MANAGEMENT_FIELDS,
-    'payslips': PAYROLL_FIELDS,
-    'leaves': PLANNING_TIMEOFF_FIELDS,
-    'vat_transactions': VAT_INPUT_OUTPUT_FIELDS
 }
 
 # --- Initialize Session State ---
@@ -215,284 +58,193 @@ if 'logged_in' not in st.session_state:
     st.session_state['role'] = None
     st.session_state['admin_selected_company_for_modules_name'] = None
 
-# Initialize USER_DB in session state (this will be populated from SQLite)
 if 'USER_DB' not in st.session_state:
-    st.session_state['USER_DB'] = {}
+    st.session_state['USER_DB'] = INITIAL_USER_DB_STRUCTURE.copy()
 
+# --- Firebase Initialization ---
+# IMPORTANT: Ensure this private_key is copied EXACTLY from your downloaded Firebase service account JSON.
+# This includes the BEGIN/END markers and all newline characters.
+FIREBASE_SERVICE_ACCOUNT_KEY_JSON = {
+  "type": "service_account",
+  "project_id": "logisticapp-63967",
+  "private_key_id": "e1d431273631bae553df5e70ee6b471b9aa3a692",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQC6lbnF91wNS+rT\n0Itd+tqu8IIc6XOTMJFglW6FzEM1rf/z9rtqGqx8zOpmAGDeEE7uCeGcA6LOAQsG\nL9i19cctBYpU2XrxgHrE+TkAyLhpN7exCihpO1FNCWr3yB3tvmlRFYfuoP051KKD\nsvSMgfdhiA3Qenq472Z2Jguk6eEaF+GVW9/HbCjDwDVPkrl5f39MtOeGxNr9rYBB\nCRYvKS+fMdXetv17KGA2tMXq0UZBt9LCZufLcCb4oUYfgrn7e/iauDnjGPBy9vtW\npYC+xGb/iz+ARtbj/R7wpzhoPwv4D3BuLOTSJrXThb2ZKZvATunrh4bCQJeAyYp2\nC5hoOrNpAgMBAAECggEAFT6qWQ1H1s89uRmyHrSrDPd/VyepNFmXuf+1xogKIIzz\n+20s7IFGQc0KxOu2294PQKkRHlSnJ03k2ZLd2eUW5UxP0oazShd7Ex299PYF0lwo\n3yCFFqtNf+gqPPWVG85+GyCIml4MCzdH/FcmY2/CcUFesk3Z1qASonIFSiUjr3bW\nFSon03VAZYtWA8WB3qn/XrI45EspuzU1NI3+pW96rQRe8mT26ryx6+EcV8huS3nN\ncp6XvPo24a0Wl1bfS8XzTElyq3CyJRjQvaI5RacRx7Y9PS5fJCfYFgwEgkHn7ZuB\nmJXrm/4oTR5ISUurYceEcrLvkPPvi3fGi/RqB/CakQKBgQDj5txlt/yl8A0hRyg1\nddg9ALL65IEqGpKS5I/K868EftshAeKuUF2KdvB4dMAqGmUCUN2/hnlUzepZcSEz\nalXzQLQk2xHTsMaw22OnWjo5LAVY/eexidp6lkfeyVvkF0SyahQMFQoPTl8KM1If\nentsN6gX6utnqVM1Czj0AgKxeQKBgQDRls0UH3rWUsR08OTUuSPE7gI0USCiERut\nJKZvN9G7cP3rAr/t1Ryxj8m3JFkFwS5OWwmwAD/rlmZP4qtzoiJ7CD8Qsx+kld2r\nSsdpiCNmF572i8j3Y4/CN2KABY+vj2bfg2MD20M1pXPGFoN5s5bWd8AM7gAyWocy\n+nqLGmsFcQKBgD439MvAYzVaR/th1dRii9p7qmFcqPa5snJv++HIjWuIxoJIZX55\nalA3EIeSODRGaHUtZpy3NcC1RtmMTSggS77RV10IgeFtTZFTE+3IcETTg9I731lU\n7VSyWoS0LGYlBBhBZZ+2zrxHBSNfx3fYlIGC4F1HQWVXkOPWYIIdWmbhAoGATUo3\nRnx1aCQNnrJXMLs1naHH3lMsnZeBhVBGsCz9gwogGVJiROqaMkC8OnWE/sJGuU6J\nPAZbjB1ijYMhhvr7jDN2TkpAGQnLPSfOcfRqWXPMg075RYHJue2CvYNPgYZ4gWSK\nVxm8p0PkdeBHi9HWhjCS+jGqkOchhIMqPbH4VYECgYBJMgUi1NR2aIGxmnh/ZgD1\nkAUuX6vMAp/cM2MWxf+voc8VHHLs68Y8J0KYziR2iJaWm6HwvRBnDw0aYtriJGeE\nNfdlmyviDlSYRMv9wUvtlFhlcxkGGYw8s3c9z3u7AD43CnPs661hlCCAzpu9y71M\ny80q6KbGDtuYTW/0j3fq0g==\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-fbsvc@logisticapp-63967.iam.gserviceaccount.com",
+  "client_id": "116053489571436273496",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-fbsvc%40logisticapp-63967.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}
 
-# --- SQLite Database Initialization and Operations ---
-DB_NAME = 'logistic_erp.db'
+# Correct the private key string by replacing escaped newlines with actual newlines
+FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key'] = FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key'].replace('\\n', '\n')
 
-def get_db_connection():
-    """Establishes and returns a new connection to the SQLite database."""
-    # Important: Create a new connection each time to avoid thread issues with Streamlit
-    conn = sqlite3.connect(DB_NAME)
-    conn.row_factory = sqlite3.Row # Allows accessing columns by name
-    return conn
+FIREBASE_PROJECT_ID = FIREBASE_SERVICE_ACCOUNT_KEY_JSON['project_id']
+FIRESTORE_ROOT_COLLECTION = "logistic_app_data" # User specified this
 
-def init_db():
-    """Initializes the database schema and populates initial user data."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+if 'firebase_app_initialized' not in st.session_state:
+    st.session_state['firebase_app_initialized'] = False
 
+if not st.session_state['firebase_app_initialized']:
     try:
-        # Create users table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY,
-                company_id TEXT NOT NULL,
-                company_name TEXT NOT NULL,
-                username TEXT NOT NULL,
-                password_hash TEXT NOT NULL,
-                role TEXT NOT NULL
-            )
-        """)
-
-        # Populate initial users if table is empty
-        cursor.execute("SELECT COUNT(*) FROM users")
-        if cursor.fetchone()[0] == 0:
-            for company_id, company_data in INITIAL_USER_DB_STRUCTURE.items():
-                for username, user_data in company_data['users'].items():
-                    cursor.execute(
-                        "INSERT INTO users (id, company_id, company_name, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)",
-                        (str(uuid.uuid4()), company_id, company_data['company_name'], username, user_data['password_hash'], user_data['role'])
-                    )
-            conn.commit()
-            st.success("Initial users populated in database!")
-
-        # Create tables for each module dynamically based on MODULE_FIELDS_MAP
-        for table_name, fields_config in MODULE_FIELDS_MAP.items():
-            columns = []
-            columns.append("doc_id TEXT PRIMARY KEY") # Unique ID for each record
-            columns.append("company_id TEXT NOT NULL") # Link to company_id from users
-            columns.append("Company TEXT NOT NULL") # Store company name directly for display
-
-            for field_name, config in fields_config.items():
-                sql_type = "TEXT"
-                if config['type'] == 'number':
-                    sql_type = "REAL"
-                elif config['type'] == 'date':
-                    sql_type = "TEXT" # (%Y-%m-%d)
-                elif config['type'] == 'datetime':
-                    sql_type = "TEXT" # (%Y-%m-%d HH:MM:SS.ffffff)
-                elif config['type'] == 'checkbox':
-                    sql_type = "INTEGER" # 0 or 1
-                
-                # Quoting column names to handle spaces and special characters.
-                columns.append(f"\"{field_name}\" {sql_type}") 
-
-            # Add explicit columns for the auto-generated IDs and Net Salary if they are not naturally in fields_config keys
-            if table_name == 'trips' and 'Trip ID' not in fields_config:
-                columns.append("\"Trip ID\" TEXT")
-            if table_name == 'rentals' and 'Rental ID' not in fields_config:
-                columns.append("\"Rental ID\" TEXT")
-            if table_name == 'invoices' and 'Inv Number' not in fields_config:
-                columns.append("\"Inv Number\" TEXT")
-            if table_name == 'invoices' and 'SI No' not in fields_config:
-                columns.append("\"SI No\" TEXT")
-            if table_name == 'payslips' and 'Payslip ID' not in fields_config:
-                columns.append("\"Payslip ID\" TEXT")
-            if table_name == 'payslips' and 'Net Salary' not in fields_config:
-                columns.append("\"Net Salary\" REAL")
-
-            create_table_sql = f"CREATE TABLE IF NOT EXISTS \"{table_name}\" ({', '.join(columns)})"
-            cursor.execute(create_table_sql)
-            conn.commit()
-        # st.success("Database tables initialized successfully.") # Commented to reduce clutter on every rerun
+        if not firebase_admin._apps:
+            cred = credentials.Certificate(FIREBASE_SERVICE_ACCOUNT_KEY_JSON)
+            firebase_admin.initialize_app(cred)
+            st.session_state['firebase_app_initialized'] = True
+            st.success("Firebase app initialized successfully!")
+        else:
+            st.session_state['firebase_app_initialized'] = True
+            st.info("Firebase app already initialized.")
     except Exception as e:
-        st.error(f"Error initializing database: {e}")
-    finally:
-        conn.close()
+        st.error(f"Error initializing Firebase: {e}")
 
-# Run database initialization on every script rerun.
-# 'CREATE TABLE IF NOT EXISTS' ensures idempotency.
-init_db()
+# Get Firestore client
+if st.session_state['firebase_app_initialized']:
+    db = firestore.client()
+else:
+    db = None
 
 
-def get_db_collection(company_id, collection_name):
-    """
-    Fetches all documents from a SQLite table for a given company.
-    Converts date/datetime strings to appropriate Python objects for Streamlit display.
-    """
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    try:
-        cursor.execute(f"SELECT * FROM \"{collection_name}\" WHERE company_id = ?", (company_id,)) # Quote table name
-        rows = cursor.fetchall()
-        
-        if not rows:
-            # Return an empty DataFrame with appropriate columns if no data
-            columns_for_empty_df = list(MODULE_FIELDS_MAP.get(collection_name, {}).keys())
-            if collection_name == 'trips': columns_for_empty_df.insert(0, 'Trip ID')
-            if collection_name == 'rentals': columns_for_empty_df.insert(0, 'Rental ID')
-            if collection_name == 'invoices': 
-                columns_for_empty_df.insert(0, 'Inv Number') 
-                columns_for_empty_df.insert(1, 'SI No') # SI No is also an auto-generated ID for invoices
-            if collection_name == 'payslips': columns_for_empty_df.insert(0, 'Payslip ID')
-            if collection_name == 'payslips' and 'Net Salary' not in columns_for_empty_df: columns_for_empty_df.append('Net Salary') # Ensure Net Salary is there
-            columns_for_empty_df.append('Company') # Company name will be stored in the table
-            columns_for_empty_df.append('doc_id') # Add doc_id as it's the primary key
-            columns_for_empty_df.append('company_id') # Internal link
-            return pd.DataFrame(columns=columns_for_empty_df)
-
-        # Convert list of sqlite3.Row objects to list of dicts
-        data_list = [dict(row) for row in rows]
-        df = pd.DataFrame(data_list)
-        
-        module_fields_config = MODULE_FIELDS_MAP.get(collection_name, {})
-
-        # Post-processing for date and datetime fields
-        for field, config in module_fields_config.items():
-            if field in df.columns and df[field].dtype == 'object': # Only try to convert object types (strings)
-                if config['type'] == 'date':
-                    df[field] = pd.to_datetime(df[field], errors='coerce').dt.date
-                elif config['type'] == 'datetime':
-                    df[field] = pd.to_datetime(df[field], errors='coerce')
-            elif field in df.columns and config['type'] == 'checkbox':
-                df[field] = df[field].astype(bool) # Convert 0/1 to boolean
-
-        # Ensure all expected columns are present, even if empty
-        expected_cols = list(module_fields_config.keys())
-        if collection_name == 'trips': expected_cols.insert(0, 'Trip ID')
-        if collection_name == 'rentals': expected_cols.insert(0, 'Rental ID')
-        if collection_name == 'invoices': 
-            expected_cols.insert(0, 'Inv Number')
-            expected_cols.insert(1, 'SI No')
-        if collection_name == 'payslips': expected_cols.insert(0, 'Payslip ID')
-        if collection_name == 'payslips' and 'Net Salary' not in expected_cols: expected_cols.append('Net Salary') # Ensure Net Salary is there
-
-        expected_cols.insert(0, 'doc_id') # Primary key
-        expected_cols.insert(1, 'company_id') # Internal link
-        expected_cols.insert(2, 'Company') # User-friendly company name
-
-        for col in expected_cols:
-            if col not in df.columns:
-                df[col] = None # Add missing columns with None
-
-        # Reorder columns to match fields_config + Company + doc_id
-        ordered_cols = [c for c in expected_cols if c in df.columns]
-        df = df[ordered_cols]
-        
-        return df
-    except sqlite3.OperationalError as e:
-        # st.warning(f"Table '{collection_name}' might not exist yet. Please add data to create it. Error: {e}") # Commented to reduce clutter
-        # Return an empty DataFrame with expected columns if table does not exist
-        columns_for_empty_df = list(MODULE_FIELDS_MAP.get(collection_name, {}).keys())
-        if collection_name == 'trips': columns_for_empty_df.insert(0, 'Trip ID')
-        if collection_name == 'rentals': columns_for_empty_df.insert(0, 'Rental ID')
-        if collection_name == 'invoices': 
-            columns_for_empty_df.insert(0, 'Inv Number')
-            columns_for_empty_df.insert(1, 'SI No')
-        if collection_name == 'payslips': columns_for_empty_df.insert(0, 'Payslip ID')
-        if collection_name == 'payslips' and 'Net Salary' not in columns_for_empty_df: columns_for_empty_df.append('Net Salary')
-        columns_for_empty_df.insert(0, 'doc_id')
-        columns_for_empty_df.insert(1, 'company_id')
-        columns_for_empty_df.insert(2, 'Company')
-        return pd.DataFrame(columns=columns_for_empty_df)
-    except Exception as e:
-        st.error(f"Error fetching data from SQLite for {collection_name}: {e}")
+# --- Firestore Interactions ---
+def firestore_get_collection(company_id, collection_name):
+    """Fetches all documents from a Firestore subcollection for a given company."""
+    if db is None:
+        st.error("Firestore database client not initialized.")
         return pd.DataFrame()
-    finally:
-        conn.close()
 
-
-def add_db_document(company_id, collection_name, data):
-    """Adds a document to a SQLite table for a given company."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    # Path: logistic_app_data/{company_id}/{collection_name}
+    collection_ref = db.collection(FIRESTORE_ROOT_COLLECTION).document(company_id).collection(collection_name)
     
-    new_doc_id = str(uuid.uuid4())
-    data['doc_id'] = new_doc_id # Assign unique ID
-
-    # Ensure company_id and Company are in data for insertion
-    data['company_id'] = company_id
-    # Get company name from USER_DB_STRUCTURE if not already in data
-    if 'Company' not in data:
-        for comp_id, comp_details in INITIAL_USER_DB_STRUCTURE.items(): # Use INITIAL_USER_DB_STRUCTURE to get name for ID
-            if comp_id == company_id:
-                data['Company'] = comp_details['company_name']
-                break
-    
-    # Convert Python types to SQLite-compatible strings/integers
-    processed_data = {}
-    for k, v in data.items():
-        if isinstance(v, datetime.date):
-            processed_data[k] = v.isoformat() # (%Y-%m-%d)
-        elif isinstance(v, datetime.datetime):
-            processed_data[k] = v.isoformat(sep=' ') # (%Y-%m-%d HH:MM:SS.ffffff)
-        elif isinstance(v, bool):
-            processed_data[k] = 1 if v else 0
-        elif pd.isna(v): # Handle pandas NaNs
-            processed_data[k] = None
-        else:
-            processed_data[k] = v
-
-    columns = ', '.join([f'"{k}"' for k in processed_data.keys()])
-    placeholders = ', '.join(['?' for _ in processed_data.keys()])
-    values = tuple(processed_data.values())
-
     try:
-        cursor.execute(f"INSERT INTO \"{collection_name}\" ({columns}) VALUES ({placeholders})", values) # Quote table name
-        conn.commit()
-        return new_doc_id
+        docs = collection_ref.stream()
+        data_list = []
+        for doc in docs:
+            doc_data = doc.to_dict()
+            doc_data['doc_id'] = doc.id # Store the actual Firestore document ID
+            data_list.append(doc_data)
+        
+        # Helper to get expected columns from module configs
+        def get_expected_columns_for_module(mod_name):
+            mapping = {
+                'trips': TRIP_MANAGEMENT_FIELDS,
+                'rentals': RENTAL_MANAGEMENT_FIELDS,
+                'vehicles': FLEET_MANAGEMENT_FIELDS,
+                'invoices': INVOICING_QUOTING_FIELDS,
+                'clients': CRM_MANAGEMENT_FIELDS,
+                'employees': EMPLOYEE_MANAGEMENT_FIELDS,
+                'payslips': PAYROLL_FIELDS,
+                'leaves': PLANNING_TIMEOFF_FIELDS,
+                'vat_transactions': VAT_INPUT_OUTPUT_FIELDS
+            }
+
+            # Map of auto-generated ID fields to ensure they are always included
+            auto_generated_ids_map = {
+                'trips': 'Trip ID',
+                'rentals': 'Rental ID',
+                'invoices': 'Inv Number', # Assuming Inv Number is the primary ID for invoices
+                'payslips': 'Payslip ID'
+            }
+
+            fields = list(mapping.get(mod_name, {}).keys())
+            cleaned_fields = []
+            for field in fields:
+                if field.endswith(" Date") or field.endswith(" Time"):
+                    # These are input fields, the combined datetime string is the actual field
+                    # The original fields_config defines "Start Date & Time" but not "Start Date" or "Start Time"
+                    # So, we directly add the combined field name.
+                    if mapping.get(mod_name, {}).get(field, {}).get('type') == 'datetime':
+                        cleaned_fields.append(field)
+                else:
+                    cleaned_fields.append(field)
+
+            # Ensure auto-generated ID field is always present
+            if mod_name in auto_generated_ids_map and auto_generated_ids_map[mod_name] not in cleaned_fields:
+                cleaned_fields.insert(0, auto_generated_ids_map[mod_name]) # Add at the beginning for consistency
+
+            return cleaned_fields + ['Company'] # Always expect 'Company' column
+
+        if data_list:
+            df = pd.DataFrame(data_list)
+            expected_cols_base = get_expected_columns_for_module(collection_name)
+            
+            # Add missing columns with None, then reorder
+            for col in expected_cols_base:
+                if col not in df.columns:
+                    df[col] = None
+            
+            # Ensure 'doc_id' is always the last column for consistency
+            if 'doc_id' not in df.columns:
+                df['doc_id'] = None
+
+            # Filter for expected columns and then reorder
+            cols_to_keep = [col for col in expected_cols_base if col in df.columns]
+            df = df[cols_to_keep + ['doc_id']]
+            
+            return df
+        else:
+            # Return an empty DataFrame with appropriate columns if no data
+            # Use get_expected_columns_for_module here to ensure correct schema for empty DFs
+            columns_for_empty_df = get_expected_columns_for_module(collection_name)
+            empty_df = pd.DataFrame(columns=columns_for_empty_df)
+            empty_df['doc_id'] = None # Always add doc_id for internal use
+            return empty_df
     except Exception as e:
-        st.error(f"Error adding document to SQLite table '{collection_name}': {e}")
+        st.error(f"Error fetching data from Firestore for {collection_name}: {e}")
+        return pd.DataFrame()
+
+
+def firestore_add_document(company_id, collection_name, data):
+    """Adds a document to a Firestore subcollection for a given company."""
+    if db is None:
+        st.error("Firestore database client not initialized. Cannot add document.")
         return None
-    finally:
-        conn.close()
 
-
-def update_db_document(company_id, collection_name, doc_id, data):
-    """Updates a document in a SQLite table for a given company."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Exclude doc_id, company_id, Company from the update statement itself as they are primary/fixed keys
-    update_data = {k: v for k, v in data.items() if k not in ['doc_id', 'company_id', 'Company']}
-
-    # Convert Python types to SQLite-compatible strings/integers
-    processed_update_data = {}
-    for k, v in update_data.items():
-        if isinstance(v, datetime.date):
-            processed_update_data[k] = v.isoformat()
-        elif isinstance(v, datetime.datetime):
-            processed_update_data[k] = v.isoformat(sep=' ')
-        elif isinstance(v, bool):
-            processed_update_data[k] = 1 if v else 0
-        elif pd.isna(v):
-            processed_update_data[k] = None
-        else:
-            processed_update_data[k] = v
-
-    set_clauses = [f'"{k}" = ?' for k in processed_update_data.keys()]
-    values = tuple(processed_update_data.values()) + (doc_id, company_id)
-
-    try:
-        cursor.execute(f"UPDATE \"{collection_name}\" SET {', '.join(set_clauses)} WHERE doc_id = ? AND company_id = ?", values) # Quote table name
-        conn.commit()
-        return True
-    except Exception as e:
-        st.error(f"Error updating document {doc_id} in SQLite table '{collection_name}': {e}")
-        return False
-    finally:
-        conn.close()
-
-
-def delete_db_document(company_id, collection_name, doc_id):
-    """Deletes a document from a SQLite table for a given company."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
+    # Path: logistic_app_data/{company_id}/{collection_name}
+    collection_ref = db.collection(FIRESTORE_ROOT_COLLECTION).document(company_id).collection(collection_name)
     
     try:
-        cursor.execute(f"DELETE FROM \"{collection_name}\" WHERE doc_id = ? AND company_id = ?", (doc_id, company_id)) # Quote table name
-        conn.commit()
+        # Firestore automatically generates a document ID if you use add()
+        update_time, doc_ref = collection_ref.add(data) # add() returns (update_time, DocumentReference)
+        return doc_ref.id # Returns the new document ID
+    except Exception as e:
+        st.error(f"Error adding document to Firestore: {e}")
+        return None
+
+
+def firestore_update_document(company_id, collection_name, doc_id, data):
+    """Updates a document in a Firestore subcollection for a given company."""
+    if db is None:
+        st.error("Firestore database client not initialized. Cannot update document.")
+        return False
+
+    # Path: logistic_app_data/{company_id}/{collection_name}/{doc_id}
+    doc_ref = db.collection(FIRESTORE_ROOT_COLLECTION).document(company_id).collection(collection_name).document(doc_id)
+    
+    try:
+        doc_ref.update(data)
         return True
     except Exception as e:
-        st.error(f"Error deleting document {doc_id} from SQLite table '{collection_name}': {e}")
+        st.error(f"Error updating document {doc_id} in Firestore: {e}")
         return False
-    finally:
-        conn.close()
+
+
+def firestore_delete_document(company_id, collection_name, doc_id):
+    """Deletes a document from a Firestore subcollection for a given company."""
+    if db is None:
+        st.error("Firestore database client not initialized. Cannot delete document.")
+        return False
+
+    # Path: logistic_app_data/{company_id}/{collection_name}/{doc_id}
+    doc_ref = db.collection(FIRESTORE_ROOT_COLLECTION).document(company_id).collection(collection_name).document(doc_id)
+    
+    try:
+        doc_ref.delete()
+        return True
+    except Exception as e:
+        st.error(f"Error deleting document {doc_id} from Firestore: {e}")
+        return False
 
 # --- Helper Functions for Reports ---
 def generate_excel_report(df, filename):
@@ -503,11 +255,6 @@ def generate_excel_report(df, filename):
     return processed_data
 
 def generate_pdf_report(df, title):
-    """
-    Generates a multi-page PDF report from a DataFrame, automatically breaking tables
-    across pages to fit standard A4 size. Tables are designed to be responsive
-    by adjusting column widths to available space and wrapping text.
-    """
     pdf = FPDF()
     pdf.add_page()
 
@@ -519,156 +266,102 @@ def generate_pdf_report(df, title):
     pdf.ln(10) # Add some space after header
 
     # Ensure all DataFrame columns are strings for consistent width calculation
-    df_str = df.astype(str).replace('None', '').replace('nan', '')
+    df_str = df.astype(str)
 
     available_width = pdf.w - pdf.l_margin - pdf.r_margin
+    # Define a reasonable minimum width to ensure character rendering
     MIN_COL_WIDTH = 15 # mm
 
     desired_widths = {}
-    # Temporarily set font for width calculation
-    pdf.set_font("Arial", "B", 10) 
+    # Calculate desired width for each column based on header and max content
+    pdf.set_font("Arial", "B", 10) # Use header font for header width calculation
     for col in df_str.columns:
-        header_width = pdf.get_string_width(str(col))
-        # Ensure max_content_width is calculated with normal font size
-        pdf.set_font("Arial", size=10)
+        # Width needed for header
+        header_width = pdf.get_string_width(col)
+        # Width needed for maximum content in the column (using normal font)
+        pdf.set_font("Arial", size=10) # Switch to data font for content width calculation
         max_content_width = 0
         if not df_str[col].empty:
             max_content_width = df_str[col].apply(pdf.get_string_width).max()
         
+        # Take the maximum of header width and content width, plus padding
         desired_widths[col] = max(header_width, max_content_width) + 6 # Add padding
-        desired_widths[col] = max(desired_widths[col], MIN_COL_WIDTH)
 
     total_desired_width = sum(desired_widths.values())
 
+    # If total desired width exceeds available page width, scale down
     col_widths = {}
     if total_desired_width > available_width:
+        # Scale all column widths proportionally
         scale_factor = available_width / total_desired_width
         for col in df_str.columns:
             col_widths[col] = max(desired_widths[col] * scale_factor, MIN_COL_WIDTH)
     else:
-        # Distribute remaining space if total_desired_width is less than available_width
+        # If total desired width is less than or equal to available width, use desired widths
+        # and ensure minimum, then distribute remaining space if any.
         remaining_width = available_width
         for col in df_str.columns:
-            col_widths[col] = desired_widths[col]
+            col_widths[col] = max(desired_widths[col], MIN_COL_WIDTH)
             remaining_width -= col_widths[col]
         
+        # Distribute any remaining space to larger columns
         if remaining_width > 0:
-            distributable_cols = [col for col, width in desired_widths.items()]
-            if distributable_cols:
-                extra_per_col = remaining_width / len(distributable_cols)
-                for col in distributable_cols:
+            large_columns = [col for col, width in col_widths.items() if width > MIN_COL_WIDTH]
+            if large_columns:
+                extra_per_col = remaining_width / len(large_columns)
+                for col in large_columns:
                     col_widths[col] += extra_per_col
-
-    # Final adjustment to ensure all columns fit, and headers are readable
-    final_total_width = sum(col_widths.values())
-    if final_total_width > available_width:
-        correction_factor = available_width / final_total_width
-        for col in col_widths:
-            col_widths[col] *= correction_factor
-
+            else: # If all columns are at min width, just add to the first column
+                if col_widths:
+                    col_widths[list(col_widths.keys())[0]] += remaining_width
+    
     # Render headers
-    pdf.set_font("Arial", "B", 10)
+    pdf.set_font("Arial", "B", 10) # Set font for headers
     for col in df_str.columns:
-        header_text = str(col)
-        # Calculate how much space the text needs
-        text_width = pdf.get_string_width(header_text)
-        
-        # If the text is too wide for the cell, truncate it with ellipsis
-        # Adjust 2 to a slightly larger value (e.g., 4) for more visual padding
-        if text_width > col_widths[col] - 4: 
-            while pdf.get_string_width(header_text + '...') > col_widths[col] - 4 and len(header_text) > 3:
-                header_text = header_text[:-1]
-            header_text += '...'
-        
-        pdf.cell(col_widths[col], 10, header_text, 1, 0, "C") # Use the adjusted header_text
+        pdf.cell(col_widths[col], 10, txt=col, border=1, align="C")
     pdf.ln()
 
     # Add data
-    pdf.set_font("Arial", size=10)
-    for index, row in df_str.iterrows():
-        # Check if new page is needed before printing the row
-        # This prediction is simplified; more complex might involve estimating row height
-        if pdf.get_y() + 10 > pdf.h - pdf.b_margin: # 10 is a rough cell height
-            pdf.add_page()
-            # Re-render headers on new page
-            pdf.set_font("Arial", "B", 10)
-            for col in df_str.columns:
-                header_text = str(col)
-                text_width = pdf.get_string_width(header_text)
-                if text_width > col_widths[col] - 4:
-                    while pdf.get_string_width(header_text + '...') > col_widths[col] - 4 and len(header_text) > 3:
-                        header_text = header_text[:-1]
-                    header_text += '...'
-                pdf.cell(col_widths[col], 10, header_text, 1, 0, "C")
-            pdf.ln()
-            pdf.set_font("Arial", size=10)
-
-        max_row_height = 0 
-        initial_x_for_row = pdf.get_x()
-        initial_y_for_row = pdf.get_y()
-
-        # First pass to determine max_row_height for multi_cell rows
-        for col_idx, col in enumerate(df_str.columns):
-            cell_text = str(row[col])
-            # For multiline content, estimate num_lines based on actual content and column width
-            estimated_num_lines = pdf.get_string_width(cell_text) / (col_widths[col] - pdf.c_margin * 2)
-            num_lines = max(1, int(estimated_num_lines) + (1 if estimated_num_lines % 1 else 0))
-            current_cell_height = num_lines * pdf.font_size * 1.2 # Adjust multiplier for line spacing
-            max_row_height = max(max_row_height, current_cell_height)
-
-        # Second pass to actually render the row with uniform height
-        for col_idx, col in enumerate(df_str.columns):
-            cell_text = str(row[col])
-            
-            # Save current position before multi_cell
-            current_x = pdf.get_x()
-            current_y = pdf.get_y()
-            
-            # Use multi_cell for all cells to handle potential wrapping, set ln=0
-            pdf.multi_cell(col_widths[col], max_row_height / max(1, num_lines), txt=cell_text, border=1, align="L") # Calculate effective line height
-            
-            # Restore X position to just after the previous cell, and Y to the start of the current row segment
-            # Then advance X for the next cell
-            pdf.set_xy(current_x + col_widths[col], initial_y_for_row)
-        
-        # After all cells in a row are processed, move to the next line based on max_row_height
-        pdf.set_y(initial_y_for_row + max_row_height + 1) # Add some padding
-        pdf.set_x(pdf.l_margin) # Reset X to left margin
+    pdf.set_font("Arial", size=10) # Smaller font for data
+    for index, row in df_str.iterrows(): # Iterate through the string-converted DataFrame
+        for col in df_str.columns:
+            cell_text = str(row[col]) # Ensure it's a string
+            # Using multi_cell with the calculated column width
+            pdf.multi_cell(col_widths[col], 7, txt=cell_text, border=1, align="L", ln=0)
+        pdf.ln() # Move to next line after all columns for the row
 
     # --- Footer ---
-    pdf.set_y(pdf.h - 15)
+    pdf.set_y(pdf.h - 15) # Position 15 units from bottom
     pdf.set_font("Arial", "I", 8)
-    pdf.cell(0, 10, f"Page {pdf.page_no()}/{{nb}}", 0, 0, "C")
+    pdf.cell(0, 10, f"Page {pdf.page_no()}/{{nb}}", 0, 0, "C") # Use {nb} for total pages
 
-    return bytes(pdf.output(dest='S'))
+    return bytes(pdf.output(dest='S')) # Explicitly cast to bytes
 
-
+# Function for generating the customized management PDF
 def generate_management_pdf_report(all_companies_data, user_db_current):
-    """
-    Generates a multi-page management dashboard report PDF with aggregated KPIs and company-specific details.
-    """
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     
     # --- Background Image / Color for Management Report ---
-    MANAGEMENT_REPORT_BACKGROUND_URL = "https://placehold.co/595x842/F0F8FF/313131?text=Management+Report+Background"
+    # Placeholder for the background image URL. In a real application, you would host
+    # your 'bill background.PNG' and use its URL here.
+    MANAGEMENT_REPORT_BACKGROUND_URL = "https://placehold.co/595x842/F0F8FF/313131.png?text=Management+Report+Background"
     try:
-        # Check if the URL is valid and reachable. Otherwise, it might cause issues.
-        # For a now, just attempt to load.
         pdf.image(MANAGEMENT_REPORT_BACKGROUND_URL, x=0, y=0, w=pdf.w, h=pdf.h)
     except Exception as e:
+        # Fallback to a solid light blue background if image fails to load
         pdf.set_fill_color(240, 248, 255) # Light blue background
         pdf.rect(0, 0, pdf.w, pdf.h, 'F')
         st.warning(f"Could not load management report background image from {MANAGEMENT_REPORT_BACKGROUND_URL}: {e}. Generating with fallback color.")
 
     # --- Header for Management Report ---
-    pdf.set_y(10)
+    pdf.set_y(10) # Start header from top
     pdf.set_font("Arial", "B", 20)
     pdf.cell(0, 10, "Global Logistic Management Dashboard Report", 0, 1, "C")
     pdf.set_font("Arial", "", 12)
     pdf.cell(0, 8, f"Report Date: {datetime.date.today().strftime('%Y-%m-%d')}", 0, 1, "C")
-    pdf.ln(10)
+    pdf.ln(10) # Space after header
 
     # Calculate overall KPIs
     total_vehicles_all = 0
@@ -680,7 +373,6 @@ def generate_management_pdf_report(all_companies_data, user_db_current):
     total_leaves_all = 0
     total_vat_amount_all = 0.0
 
-
     # Data for charts (summaries for PDF)
     vehicles_by_type_data = {}
     revenue_by_company_data = {}
@@ -688,26 +380,31 @@ def generate_management_pdf_report(all_companies_data, user_db_current):
     trips_by_company_data = {}
 
 
-    for company_id_key, company_details in user_db_current.items():
-        if company_details['company_pin'] != 'ADMIN':
+    for company_id_key, company_details in user_db_current.items(): # Iterating through USER_DB_CURRENT for companies
+        if company_details['company_pin'] != 'ADMIN': # Exclude the admin company for operational data
             comp_name = company_details['company_name']
             
+            # Safely get dataframes from the 'all_companies_data' (which is sourced from Firestore)
             comp_vehicles_df = all_companies_data.get('vehicles', pd.DataFrame())
             if not comp_vehicles_df.empty and 'Company' in comp_vehicles_df.columns:
+                # FIX: Corrected indexing to use comp_vehicles_df for filtering
                 company_specific_vehicles_df = comp_vehicles_df[comp_vehicles_df['Company'] == comp_name]
                 total_vehicles_all += len(company_specific_vehicles_df)
+                # Aggregate for Vehicles by Type
                 for v_type in company_specific_vehicles_df['Vehicle Type'].unique():
                     vehicles_by_type_data[v_type] = vehicles_by_type_data.get(v_type, 0) + len(company_specific_vehicles_df[company_specific_vehicles_df['Vehicle Type'] == v_type])
 
 
             comp_employees_df = all_companies_data.get('employees', pd.DataFrame())
             if not comp_employees_df.empty and 'Company' in comp_employees_df.columns:
+                # FIX: Corrected indexing to use comp_employees_df for filtering
                 company_specific_employees_df = comp_employees_df[comp_employees_df['Company'] == comp_name]
                 total_employees_all += len(company_specific_employees_df)
                 employees_by_company_data[comp_name] = len(company_specific_employees_df)
 
             comp_invoices_df = all_companies_data.get('invoices', pd.DataFrame())
             if not comp_invoices_df.empty and 'Company' in comp_invoices_df.columns and 'Total Amount' in comp_invoices_df.columns:
+                # FIX: Corrected indexing to use comp_invoices_df for filtering
                 company_specific_invoices_df = comp_invoices_df[comp_invoices_df['Company'] == comp_name]
                 company_revenue = company_specific_invoices_df['Total Amount'].sum()
                 total_revenue_all += company_revenue
@@ -715,6 +412,7 @@ def generate_management_pdf_report(all_companies_data, user_db_current):
 
             comp_trips_df = all_companies_data.get('trips', pd.DataFrame())
             if not comp_trips_df.empty and 'Company' in comp_trips_df.columns:
+                # FIX: Corrected indexing to use comp_trips_df for filtering
                 company_specific_trips_df = comp_trips_df[comp_trips_df['Company'] == comp_name]
                 total_trips_all += len(company_specific_trips_df)
                 trips_by_company_data[comp_name] = len(company_specific_trips_df)
@@ -801,13 +499,14 @@ def generate_management_pdf_report(all_companies_data, user_db_current):
     pdf.ln(5)
 
     for company_id_key, company_details in user_db_current.items():
-        if company_details['company_pin'] != 'ADMIN':
+        if company_details['company_pin'] != 'ADMIN': # Exclude the admin company
             comp_name = company_details['company_name']
             
             pdf.set_font("Arial", "BU", 12)
             pdf.cell(0, 10, f"Company: {comp_name}", 0, 1, "L")
             pdf.set_font("Arial", "", 10)
 
+            # Get company specific data from the 'all_companies_data' (Firestore sourced)
             comp_vehicles_df = all_companies_data.get('vehicles', pd.DataFrame())
             comp_vehicles_df_filtered = comp_vehicles_df[comp_vehicles_df['Company'] == comp_name] if not comp_vehicles_df.empty and 'Company' in comp_vehicles_df.columns else pd.DataFrame()
 
@@ -846,1675 +545,1169 @@ def generate_management_pdf_report(all_companies_data, user_db_current):
             company_vat_amount = comp_vat_df_filtered['VAT Amount'].sum() if 'VAT Amount' in comp_vat_df_filtered.columns else 0.0
             pdf.cell(0, 7, f"- Total VAT Amount: INR {company_vat_amount:,.2f}", 0, 1, "L")
             
-            pdf.ln(5)
+            pdf.ln(5) # Space between companies
 
     # --- Footer for Management Report ---
-    pdf.set_y(pdf.h - 15)
+    pdf.set_y(pdf.h - 15) # Position 15 units from bottom
     pdf.set_font("Arial", "I", 8)
     pdf.cell(0, 10, f"Page {pdf.page_no()}/{{nb}} - Global Management Report", 0, 0, "C")
 
     return bytes(pdf.output(dest='S'))
 
 
-def generate_single_tax_invoice_pdf(invoice_data, company_details, logo_url, logo_x, logo_y, logo_width, logo_height):
+def generate_single_tax_invoice_pdf(invoice_data, company_name_actual, company_pin_actual, logo_url, logo_x, logo_y, logo_width, logo_height):
     """
     Generates a single tax invoice PDF based on the provided invoice data and company details.
     Incorporates a background image (simulating bill background.PNG) and a customizable logo.
-    The output is constrained to a single A4 page for a standard invoice format,
-    with text wrapping handled for 'Particulars' and 'Remarks'.
-    
-    Args:
-        invoice_data (dict): Dictionary containing invoice details like 'Inv Number', 'Date',
-                             'Amount', 'VAT (10%)', 'Total Amount', 'Client', 'Particulars', 'Remarks'.
-        company_details (dict): Dictionary containing company-specific details:
-                                'name', 'trn', 'address_line1', 'address_line2', 'city_country', 'email', 'phone'.
-        logo_url (str): URL of the company logo.
-        logo_x (int/float): X coordinate for logo placement.
-        logo_y (int/float): Y coordinate for logo placement.
-        logo_width (int/float): Width of the logo.
-        logo_height (int/float): Height of the logo.
     """
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_auto_page_break(auto=False, margin=10) # Set auto page break to False for single page control
+    pdf.set_auto_page_break(auto=True, margin=15)
 
     # --- Background Image (simulating bill background.PNG letterhead) ---
-    BACKGROUND_IMAGE_URL = "https://i.ibb.co/RGTCjMb4/EAST-CONCORD-W-L-L-page-0001-1.jpg" 
+    # IMPORTANT: Replace this URL with the actual hosted URL of your 'bill background.PNG' image.
+    # For testing, you can use a placeholder like the one below, but it won't show your specific image.
+    BACKGROUND_IMAGE_URL = "https://i.ibb.co/RGTCjMb4/EAST-CONCORD-W-L-L-page-0001-1.jpg"  
     try:
         pdf.image(BACKGROUND_IMAGE_URL, x=0, y=0, w=pdf.w, h=pdf.h)
     except Exception as e:
         st.warning(f"Could not load background image from {BACKGROUND_IMAGE_URL}: {e}. Generating without background image.")
-        pdf.set_fill_color(240, 248, 255)
-        pdf.rect(0, 0, pdf.w, pdf.h, 'F')
+        # Fallback to a solid light blue background if image fails to load
+        pdf.set_fill_color(240, 248, 255) # Light blue background
+        pdf.rect(100, 20, pdf.w, pdf.h, 'F')
+
+    # Add background watermark (if not part of the background image, or to overlay)
+    pdf.set_font("Arial", "B", 80)
+    pdf.set_text_color(200, 200, 200) # Light gray
+    pdf.text(pdf.w / 2 - pdf.get_string_width("INVOICE") / 2, pdf.h / 2 + 10, "INVOICE")
+    pdf.set_text_color(0, 0, 0) # Reset text color
 
     # --- Customizable Logo (separate from background, top left) ---
+    # This logo will overlay on the background image. Replace with actual hosted logo URL.
     try:
-        if logo_url:
-            pdf.image(logo_url, x=logo_x, y=logo_y, w=logo_width, h=logo_height)
+        pdf.image(logo_url, x=logo_x, y=logo_y, w=logo_width, h=logo_height)
     except Exception as e:
         st.warning(f"Could not load logo image from {logo_url}: {e}. Continuing without logo.")
 
-    # --- Header Section (Company Info - dynamically populated based on company_details) ---
-    pdf.set_y(25)
+    # --- Custom Header Section for Invoice ---
+    # Position adjusted to not overlap with typical letterhead top area
+    pdf.set_y(25) # Adjust starting Y position for header content
     pdf.set_font("Arial", "", 9)
-    pdf.set_text_color(50, 50, 50)
+    pdf.set_text_color(50, 50, 50) # Darker gray for header text
     
+    # Example header content (replace with actual data for your company if not in background image)
+    pdf.set_x(10) # Align with left margin
+    pdf.cell(0, 5, "EAST CONCORD W.L.L", 0, 1, "L")
+    pdf.set_x(50)
+    pdf.cell(0, 5, "Flat/Shop No. 11, Building 471", 0, 1, "L")
     pdf.set_x(10)
-    pdf.cell(0, 5, company_details.get("name", "YOUR COMPANY NAME W.L.L"), 0, 1, "L")
+    pdf.cell(0, 5, "Road/Shop 3513, MANAMA", 0, 1, "L")
     pdf.set_x(10)
-    pdf.cell(0, 5, company_details.get("address_line1", "Flat/Shop No. X, Building Y"), 0, 1, "L")
+    pdf.cell(0, 5, "UMM AL-HASSAM, Kingdom of Bahrain", 0, 1, "L")
     pdf.set_x(10)
-    pdf.cell(0, 5, company_details.get("address_line2", "Road/Shop XXXX, City"), 0, 1, "L")
+    pdf.cell(0, 5, f"TRN: {company_pin_actual}", 0, 1, "L") # Using company_pin as TRN example
     pdf.set_x(10)
-    pdf.cell(0, 5, company_details.get("city_country", "District, Kingdom of Bahrain"), 0, 1, "L")
-    pdf.set_x(10)
-    pdf.cell(0, 5, f"TRN: {company_details.get('trn', 'N/A')}", 0, 1, "L")
-    pdf.set_x(10)
-    pdf.cell(0, 5, f"Email: {company_details.get('email', 'info@example.com')}", 0, 1, "L")
-    pdf.set_x(10)
-    pdf.cell(0, 5, f"Phone: {company_details.get('phone', 'N/A')}", 0, 1, "L")
-    pdf.ln(5)
-    pdf.set_text_color(0, 0, 0)
+    pdf.cell(0, 5, "Email: concord@email.com (Mock)", 0, 1, "L")
+    pdf.ln(5) # Space after header details
 
-
-    pdf.set_y(pdf.get_y() + 5)
+    # --- Invoice Title ---
+    pdf.set_y(50) # Move down for the main invoice title
     pdf.set_font("Arial", "B", 24)
-    pdf.cell(0, 20, "Tax Invoice", 0, 1, "C")
+    pdf.set_text_color(0, 0, 0) # Black
+    pdf.cell(0, 10, "TAX INVOICE", 0, 1, "C")
     pdf.ln(5)
 
-    # --- Invoice Details & Bill To Section ---
-    pdf.set_font("Arial", "B", 10)
-    line_height = 6
-
-    x_left_col = 10
-    current_y_after_title = pdf.get_y() 
-    pdf.set_xy(x_left_col, current_y_after_title)
-
-    pdf.cell(30, line_height, "Invoice No.", 1, 0, "L")
+    # --- Invoice Details (Top Right Block) ---
     pdf.set_font("Arial", "", 10)
-    pdf.cell(60, line_height, str(invoice_data.get('Inv Number', 'N/A')), 1, 1, "L")
-    pdf.set_x(x_left_col)
-
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(30, line_height, "Date", 1, 0, "L")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(60, line_height, str(invoice_data.get('Date', 'N/A')), 1, 1, "L")
-    pdf.set_x(x_left_col)
-
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(30, line_height, "Delivery Note", 1, 0, "L")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(60, line_height, "N/A", 1, 1, "L")
-    pdf.set_x(x_left_col)
-
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(30, line_height, "Buyer's Order No.", 1, 0, "L")
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(60, line_height, "N/A", 1, 1, "L")
-    
-    x_right_col = 105
-    pdf.set_xy(x_right_col, current_y_after_title) 
-
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(0, line_height, "Bill To:", 0, 1, "L")
-    pdf.set_x(x_right_col)
-    pdf.set_font("Arial", "", 10)
-    pdf.cell(0, line_height, str(invoice_data.get('Client', 'N/A')), 0, 1, "L")
-    
-    pdf.set_x(x_right_col)
-    pdf.cell(0, line_height, "Client Address Line 1 (Mock)", 0, 1, "L")
-    pdf.set_x(x_right_col)
-    pdf.cell(0, line_height, "Client Address Line 2 (Mock)", 0, 1, "L")
-    pdf.set_x(x_right_col)
-    pdf.cell(0, line_height, f"Client TRN: ClientTaxID (Mock)", 0, 1, "L")
-    
-    pdf.set_y(max(pdf.get_y(), current_y_after_title + (4 * line_height) + 5))
-    pdf.ln(5)
-
-    # --- Particulars Table ---
-    pdf.set_font("Arial", "B", 10)
-    
-    col_headers = ["SR.NO", "Particulars", "Quantity", "Rate", "Amount", "VAT(BHD)", "Total"]
-    col_widths = [15, 65, 20, 25, 25, 25, 30]
-
-    for i, header in enumerate(col_headers):
-        pdf.cell(col_widths[i], 10, header, 1, 0, "C")
-    pdf.ln()
-
-    pdf.set_font("Arial", "", 10)
-    sl_no = 1
-    particulars = str(invoice_data.get('Particulars', 'Logistic Services'))
-    qty = invoice_data.get('Quantity', 1) 
-    rate = invoice_data.get('Rate', 0.0)
-    amount = invoice_data.get('Amount', 0.0)
-    vat_amount = invoice_data.get('VAT (10%)', 0.0)
-    total_amount = invoice_data.get('Total Amount', 0.0)
-
-    try:
-        qty = float(qty)
-    except (ValueError, TypeError):
-        qty = 0.0
-    try:
-        rate = float(rate)
-    except (ValueError, TypeError):
-        rate = 0.0
-    try:
-        amount = float(amount)
-    except (ValueError, TypeError):
-        amount = 0.0
-    try:
-        vat_amount = float(vat_amount)
-    except (ValueError, TypeError):
-        vat_amount = 0.0
-    try:
-        total_amount = float(total_amount)
-    except (ValueError, TypeError):
-        total_amount = 0.0
-
-    current_x = pdf.get_x()
+    # Right-align a block of information
     current_y = pdf.get_y()
-    
-    # Calculate particulars height for multi_cell
-    temp_pdf = FPDF()
-    temp_pdf.set_font("Arial", "", 10)
-    # The trick is to temporarily add a page and use multi_cell to get the height
-    # without actually drawing it.
-    temp_pdf.add_page()
-    # Reset x,y to 0,0 to ensure consistent calculation regardless of current PDF state
-    temp_pdf.set_xy(0,0)
-    # Call multi_cell with a dummy line height to get the number of lines
-    # The actual second argument (h) for multi_cell doesn't matter for this calculation
-    # as long as it's large enough to not force a page break within multi_cell itself.
-    temp_pdf.multi_cell(col_widths[1] - (temp_pdf.c_margin * 2), 1, particulars, border=0, align="L", ln=0)
-    
-    # After multi_cell, the Y position will indicate the total height consumed.
-    # We need the relative height from where multi_cell started.
-    particulars_height_raw = temp_pdf.get_y() # This is cumulative height after the dummy multi_cell
+    right_col_x = pdf.w - pdf.r_margin - 60 # Position for right-aligned block, 60mm wide
+    pdf.set_xy(right_col_x, current_y)
+    pdf.cell(60, 7, f"Invoice Number: {invoice_data.get('Inv Number', 'N/A')}", 0, 1, "R")
+    pdf.set_x(right_col_x)
+    pdf.cell(60, 7, f"Invoice Date: {invoice_data.get('Inv Date', 'N/A')}", 0, 1, "R")
+    pdf.set_x(right_col_x)
+    pdf.cell(60, 7, f"Due Date: {invoice_data.get('Due Date', 'N/A')}", 0, 1, "R")
+    pdf.set_x(right_col_x)
+    pdf.cell(60, 7, f"Payment Status: {invoice_data.get('Payment Status', 'N/A')}", 0, 1, "R")
+    pdf.ln(5) # Add space after invoice details
 
-    # The effective height for each line inside multi_cell is pdf.font_size * line_spacing_factor
-    # A standard line in FPDF with a font size of 10 is about 4-5mm high.
-    # The text_color_cell method also adds some internal padding.
-    # Let's assume a line height of 5mm for single-line text and adjust for multiline.
-    single_line_height = 5
-    num_lines = max(1, round(particulars_height_raw / single_line_height)) # Estimate number of lines
-    calculated_cell_height = max(10, num_lines * single_line_height) # Ensure minimum 10mm for table cell height
-
-    pdf.cell(col_widths[0], calculated_cell_height, str(sl_no), 1, 0, "C")
-    
-    x_after_sr = pdf.get_x()
-    pdf.multi_cell(col_widths[1], calculated_cell_height / num_lines, particulars, border=1, align="L", ln=0)
-    pdf.set_xy(x_after_sr + col_widths[1], current_y) # Reset X to continue row after multi_cell
-
-    pdf.cell(col_widths[2], calculated_cell_height, f"{qty:,.0f}", 1, 0, "R")
-    pdf.cell(col_widths[3], calculated_cell_height, f"{rate:,.2f}", 1, 0, "R")
-    pdf.cell(col_widths[4], calculated_cell_height, f"{amount:,.2f}", 1, 0, "R")
-    pdf.cell(col_widths[5], calculated_cell_height, f"{vat_amount:,.2f}", 1, 0, "R")
-    pdf.cell(col_widths[6], calculated_cell_height, f"{total_amount:,.2f}", 1, 1, "R")
-
-    # Totals
-    pdf.set_font("Arial", "B", 10)
-    total_label_width = sum(col_widths[0:4])
-    pdf.cell(total_label_width, 7, "Total", 1, 0, "L")
+    # --- Bill To Section (Left Block) ---
+    pdf.set_y(current_y) # Reset Y to align with the top-right block
+    pdf.set_x(pdf.l_margin) # Reset X to left margin
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(0, 7, "BILL TO:", 0, 1, "L")
     pdf.set_font("Arial", "", 10)
-
-    pdf.cell(col_widths[4], 7, f"{amount:,.2f}", 1, 0, "R")
-    pdf.cell(col_widths[5], 7, f"{vat_amount:,.2f}", 1, 0, "R")
-    pdf.cell(col_widths[6], 7, f"{total_amount:,.2f}", 1, 1, "R")
-
-    # --- Amount in words ---
-    pdf.set_y(pdf.get_y() + 10)
-    pdf.set_font("Arial", "B", 10)
-    amount_in_words_val = total_amount if isinstance(total_amount, (int, float)) else 0.0
-    pdf.cell(0, 7, f"Amount chargeable (in words): {num2words(amount_in_words_val, lang='en_IN').replace(' and zero cents', '').title()} Only", 0, 1, "L")
-    pdf.ln(5)
-
-    # --- Remarks ---
-    pdf.set_font("Arial", "B", 10)
-    pdf.cell(0, 7, "Remarks:", 0, 1, "L")
-    pdf.set_font("Arial", "", 10)
-    remarks_text = str(invoice_data.get('Remarks', 'No specific remarks.'))
-    # Adjust multi_cell for remarks for single page fit
-    pdf.multi_cell(pdf.w - pdf.l_margin - pdf.r_margin, 5, remarks_text, 0, "L")
+    pdf.cell(0, 5, f"{invoice_data.get('Client Name', 'N/A')}", 0, 1, "L")
+    pdf.cell(0, 5, f"{invoice_data.get('Client Address', 'N/A')}", 0, 1, "L")
+    pdf.cell(0, 5, f"Client Contact: {invoice_data.get('Client Contact', 'N/A')}", 0, 1, "L")
+    pdf.cell(0, 5, f"Client TRN: {invoice_data.get('Client TRN', 'N/A')}", 0, 1, "L")
     pdf.ln(10)
 
-    # --- Signature block (positioned relative to bottom) ---
-    # Calculate available vertical space for signature and footer
-    remaining_vertical_space = pdf.h - pdf.get_y() - pdf.b_margin 
+    # --- Items Table ---
+    pdf.set_font("Arial", "B", 10)
+    # Define column widths (adjust as needed)
+    col_widths = [10, 80, 20, 25, 25] # SN, Item Description, Quantity, Unit Price, Amount
     
-    # Signature block height estimate (2 lines of text + 1 line space + 2 underscores)
-    signature_block_height_estimate = 5 + 5 + 15 + 5 # Approx. 30mm
+    # Table Header
+    pdf.cell(col_widths[0], 10, "SN", 1, 0, "C")
+    pdf.cell(col_widths[1], 10, "Item Description", 1, 0, "C")
+    pdf.cell(col_widths[2], 10, "Quantity", 1, 0, "C")
+    pdf.cell(col_widths[3], 10, "Unit Price", 1, 0, "C")
+    pdf.cell(col_widths[4], 10, "Amount", 1, 1, "C") # 1 for new line
 
-    # Only print if there's enough space
-    if remaining_vertical_space > signature_block_height_estimate:
-        pdf.set_y(pdf.h - 65) # Adjust this value as needed to fit above the footer
-        pdf.set_font("Arial", "B", 10)
-        
-        pdf.cell(pdf.w/2 - 20, 5, f"For {company_details['name']}", 0, 0, "L") 
-        pdf.cell(0, 5, "Authorized Signatory", 0, 1, "R")
-        pdf.ln(15)
-        
-        pdf.cell(pdf.w/2 - 20, 0, "____________________", 0, 0, "L")
-        pdf.cell(0, 0, "____________________", 0, 1, "R")
-    else:
-        st.warning("Not enough space for signature block on invoice.")
+    pdf.set_font("Arial", "", 9)
+    items_json_str = invoice_data.get('Items', '[]')
+    try:
+        items = json.loads(items_json_str)
+    except json.JSONDecodeError:
+        items = [] # Fallback to empty list if parsing fails
+
+    sn = 1
+    for item in items:
+        pdf.cell(col_widths[0], 7, str(sn), 1, 0, "C")
+        pdf.cell(col_widths[1], 7, item.get('Description', ''), 1, 0, "L")
+        pdf.cell(col_widths[2], 7, str(item.get('Quantity', '')), 1, 0, "C")
+        pdf.cell(col_widths[3], 7, f"{float(item.get('Unit Price', 0)):,.2f}", 1, 0, "R")
+        pdf.cell(col_widths[4], 7, f"{float(item.get('Amount', 0)):,.2f}", 1, 1, "R")
+        sn += 1
+    pdf.ln(5)
+
+    # --- Totals Section (Right Aligned) ---
+    pdf.set_x(pdf.w - pdf.r_margin - 80) # Adjust X to align totals to the right
+    pdf.set_font("Arial", "B", 10)
     
-    # --- Custom Footer Section (positioned at the very bottom) ---
-    pdf.set_y(pdf.h - 15)
+    # Subtotal
+    subtotal = float(invoice_data.get('Subtotal', 0))
+    pdf.cell(50, 7, "Subtotal:", 0, 0, "R")
+    pdf.cell(30, 7, f"INR {subtotal:,.2f}", 0, 1, "R")
+
+    # Discount
+    discount = float(invoice_data.get('Discount', 0))
+    pdf.set_x(pdf.w - pdf.r_margin - 80)
+    pdf.cell(50, 7, "Discount:", 0, 0, "R")
+    pdf.cell(30, 7, f"INR {discount:,.2f}", 0, 1, "R")
+
+    # VAT Amount
+    vat_amount = float(invoice_data.get('VAT Amount', 0))
+    pdf.set_x(pdf.w - pdf.r_margin - 80)
+    pdf.cell(50, 7, f"VAT ({invoice_data.get('VAT Rate', 'N/A')}%):", 0, 0, "R")
+    pdf.cell(30, 7, f"INR {vat_amount:,.2f}", 0, 1, "R")
+
+    # Total Amount
+    total_amount = float(invoice_data.get('Total Amount', 0))
+    pdf.set_x(pdf.w - pdf.r_margin - 80)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(50, 8, "TOTAL AMOUNT:", 1, 0, "R", fill=True) # Highlight total
+    pdf.cell(30, 8, f"INR {total_amount:,.2f}", 1, 1, "R", fill=True) # Highlight total
+    pdf.ln(5)
+
+    # Amount in words
+    amount_in_words = ""
+    try:
+        amount_in_words = num2words(total_amount, lang='en_IN').title() + " Indian Rupees Only"
+    except Exception as e:
+        amount_in_words = "Amount in words conversion error."
+        st.warning(f"Error converting amount to words: {e}")
+
+    pdf.set_font("Arial", "I", 10)
+    pdf.cell(0, 7, f"Amount In Words: {amount_in_words}", 0, 1, "L")
+    pdf.ln(10)
+
+    # --- Notes/Terms ---
+    pdf.set_font("Arial", "", 10)
+    pdf.cell(0, 7, "Notes:", 0, 1, "L")
+    pdf.multi_cell(0, 5, invoice_data.get('Notes', 'Thank you for your business!'), 0, "L")
+    pdf.ln(10)
+
+    # --- Bank Details (Example) ---
+    pdf.set_font("Arial", "B", 10)
+    pdf.cell(0, 7, "Bank Details:", 0, 1, "L")
+    pdf.set_font("Arial", "", 9)
+    pdf.cell(0, 5, "Bank Name: XYZ Bank", 0, 1, "L")
+    pdf.cell(0, 5, "Account Name: EAST CONCORD W.L.L", 0, 1, "L")
+    pdf.cell(0, 5, "Account Number: 1234567890", 0, 1, "L")
+    pdf.cell(0, 5, "IBAN: BHXX XXXX XXXX XXXX XXXX XXXX", 0, 1, "L")
+    pdf.cell(0, 5, "SWIFT/BIC: ABCDEFGH", 0, 1, "L")
+    pdf.ln(15)
+
+    # --- Signature Line ---
+    pdf.set_x(pdf.w - pdf.r_margin - 60) # Position for signature on the right
+    pdf.cell(60, 5, "_________________________", 0, 1, "C")
+    pdf.set_x(pdf.w - pdf.r_margin - 60)
+    pdf.cell(60, 5, "Authorized Signature", 0, 1, "C")
+    pdf.ln(10)
+
+    # --- Footer for Invoice ---
+    pdf.set_y(pdf.h - 15) # Position 15 units from bottom
     pdf.set_font("Arial", "I", 8)
-    pdf.set_text_color(50, 50, 50)
-    pdf.cell(0, 10, f"CR No. 166155-1 | Tel: 17228646 | Mob: 39884260, 339660641 | Bldg: 471, Flat 11 | Road: 3513, Block: 335 | Manama / Umm Alhassam, Kingdom of Bahrain", 0, 0, "C")
-    
+    pdf.cell(0, 10, f"Page {pdf.page_no()}/{{nb}}", 0, 0, "C") # Use {nb} for total pages
+
     return bytes(pdf.output(dest='S'))
 
 
-def add_serial_numbers(df):
-    """Adds a 'SL No' column starting from 1 to a DataFrame."""
-    df_copy = df.copy()
-    if 'SL No' in df_copy.columns:
-        df_copy = df_copy.drop(columns=['SL No'])
+# --- Data Management (Load/Save DataFrames) ---
+# This part now integrates with Firestore.
+# When a module is selected, data is fetched. When modified, it's pushed back.
+
+# Module Configuration - Defines fields for each module
+TRIP_MANAGEMENT_FIELDS = {
+    "Trip ID": {"type": "text", "editable": False},
+    "Customer Name": {"type": "text", "editable": True},
+    "Origin": {"type": "text", "editable": True},
+    "Destination": {"type": "text", "editable": True},
+    "Start Date & Time": {"type": "datetime", "editable": True},
+    "End Date & Time": {"type": "datetime", "editable": True},
+    "Vehicle Used": {"type": "text", "editable": True},
+    "Driver": {"type": "text", "editable": True},
+    "Status": {"type": "select", "options": ["Scheduled", "In Progress", "Completed", "Cancelled"], "editable": True},
+    "Cargo Type": {"type": "text", "editable": True},
+    "Weight (kg)": {"type": "number", "editable": True},
+    "Revenue (INR)": {"type": "number", "editable": True},
+    "Expenses (INR)": {"type": "number", "editable": True},
+    "Notes": {"type": "textarea", "editable": True},
+}
+
+RENTAL_MANAGEMENT_FIELDS = {
+    "Rental ID": {"type": "text", "editable": False},
+    "Client Name": {"type": "text", "editable": True},
+    "Vehicle Rented": {"type": "text", "editable": True},
+    "Start Date & Time": {"type": "datetime", "editable": True},
+    "End Date & Time": {"type": "datetime", "editable": True},
+    "Rental Rate per Day (INR)": {"type": "number", "editable": True},
+    "Total Rental Cost (INR)": {"type": "number", "editable": False}, # Calculated
+    "Status": {"type": "select", "options": ["Booked", "Active", "Completed", "Cancelled"], "editable": True},
+    "Notes": {"type": "textarea", "editable": True},
+}
+
+FLEET_MANAGEMENT_FIELDS = {
+    "Vehicle ID": {"type": "text", "editable": False}, # e.g., Plate Number
+    "Vehicle Type": {"type": "select", "options": ["Truck", "Trailer", "Van", "Car", "Motorbike", "Other"], "editable": True},
+    "Make": {"type": "text", "editable": True},
+    "Model": {"type": "text", "editable": True},
+    "Year": {"type": "number", "editable": True},
+    "License Plate": {"type": "text", "editable": True},
+    "VIN": {"type": "text", "editable": True},
+    "Acquisition Date": {"type": "date", "editable": True},
+    "Current Mileage (km)": {"type": "number", "editable": True},
+    "Maintenance Due Date": {"type": "date", "editable": True},
+    "Insurance Expiry Date": {"type": "date", "editable": True},
+    "Registration Expiry Date": {"type": "date", "editable": True},
+    "Status": {"type": "select", "options": ["Active", "Under Maintenance", "Retired"], "editable": True},
+    "Assigned Driver": {"type": "text", "editable": True},
+    "Notes": {"type": "textarea", "editable": True},
+}
+
+INVOICING_QUOTING_FIELDS = {
+    "Inv Number": {"type": "text", "editable": False},
+    "Inv Date": {"type": "date", "editable": True},
+    "Due Date": {"type": "date", "editable": True},
+    "Client Name": {"type": "text", "editable": True},
+    "Client Address": {"type": "text", "editable": True},
+    "Client Contact": {"type": "text", "editable": True},
+    "Client TRN": {"type": "text", "editable": True}, # Tax Registration Number
+    "Items": {"type": "json_table", "editable": True}, # Stored as JSON string of list of dicts
+    "Subtotal": {"type": "number", "editable": False}, # Calculated
+    "Discount": {"type": "number", "editable": True},
+    "VAT Rate": {"type": "select", "options": [0, 5, 10, 15], "editable": True}, # Common VAT rates
+    "VAT Amount": {"type": "number", "editable": False}, # Calculated
+    "Total Amount": {"type": "number", "editable": False}, # Calculated
+    "Payment Status": {"type": "select", "options": ["Pending", "Paid", "Overdue", "Partial"], "editable": True},
+    "Notes": {"type": "textarea", "editable": True},
+}
+
+CRM_MANAGEMENT_FIELDS = {
+    "Client ID": {"type": "text", "editable": False},
+    "Client Name": {"type": "text", "editable": True},
+    "Contact Person": {"type": "text", "editable": True},
+    "Email": {"type": "text", "editable": True},
+    "Phone": {"type": "text", "editable": True},
+    "Address": {"type": "text", "editable": True},
+    "TRN": {"type": "text", "editable": True}, # Tax Registration Number
+    "Notes": {"type": "textarea", "editable": True},
+    "Last Interaction Date": {"type": "date", "editable": True},
+    "Preferred Service": {"type": "text", "editable": True},
+}
+
+EMPLOYEE_MANAGEMENT_FIELDS = {
+    "Employee ID": {"type": "text", "editable": False},
+    "Name": {"type": "text", "editable": True},
+    "Position": {"type": "text", "editable": True},
+    "Department": {"type": "text", "editable": True},
+    "Date of Joining": {"type": "date", "editable": True},
+    "Contact Number": {"type": "text", "editable": True},
+    "Email": {"type": "text", "editable": True},
+    "Address": {"type": "text", "editable": True},
+    "Emergency Contact Name": {"type": "text", "editable": True},
+    "Emergency Contact Number": {"type": "text", "editable": True},
+    "Bank Account Number": {"type": "text", "editable": True},
+    "IBAN": {"type": "text", "editable": True},
+    "Civil ID/Passport No.": {"type": "text", "editable": True},
+    "Nationality": {"type": "text", "editable": True},
+    "Basic Salary (INR)": {"type": "number", "editable": True},
+    "Allowance (INR)": {"type": "number", "editable": True},
+    "Deductions (INR)": {"type": "number", "editable": True},
+    "Status": {"type": "select", "options": ["Active", "On Leave", "Terminated"], "editable": True},
+    "Notes": {"type": "textarea", "editable": True},
+}
+
+PAYROLL_FIELDS = {
+    "Payslip ID": {"type": "text", "editable": False},
+    "Employee ID": {"type": "text", "editable": True},
+    "Employee Name": {"type": "text", "editable": True},
+    "Pay Period Start Date": {"type": "date", "editable": True},
+    "Pay Period End Date": {"type": "date", "editable": True},
+    "Payment Date": {"type": "date", "editable": True},
+    "Basic Salary (INR)": {"type": "number", "editable": True},
+    "Allowance (INR)": {"type": "number", "editable": True},
+    "Overtime Pay (INR)": {"type": "number", "editable": True},
+    "Gross Salary (INR)": {"type": "number", "editable": False}, # Calculated
+    "Deductions (INR)": {"type": "number", "editable": True},
+    "Net Salary (INR)": {"type": "number", "editable": False}, # Calculated
+    "Payment Method": {"type": "select", "options": ["Bank Transfer", "Cash", "Cheque"], "editable": True},
+    "Status": {"type": "select", "options": ["Paid", "Pending"], "editable": True},
+    "Notes": {"type": "textarea", "editable": True},
+}
+
+PLANNING_TIMEOFF_FIELDS = {
+    "Leave ID": {"type": "text", "editable": False},
+    "Employee ID": {"type": "text", "editable": True},
+    "Employee Name": {"type": "text", "editable": True},
+    "Leave Type": {"type": "select", "options": ["Annual Leave", "Sick Leave", "Maternity Leave", "Paternity Leave", "Unpaid Leave", "Other"], "editable": True},
+    "Start Date": {"type": "date", "editable": True},
+    "End Date": {"type": "date", "editable": True},
+    "Number of Days": {"type": "number", "editable": False}, # Calculated
+    "Status": {"type": "select", "options": ["Pending", "Approved", "Rejected", "Cancelled"], "editable": True},
+    "Reason": {"type": "textarea", "editable": True},
+    "Approved By": {"type": "text", "editable": True},
+}
+
+VAT_INPUT_OUTPUT_FIELDS = {
+    "Transaction ID": {"type": "text", "editable": False},
+    "Date": {"type": "date", "editable": True},
+    "Type": {"type": "select", "options": ["Input VAT", "Output VAT"], "editable": True},
+    "Description": {"type": "textarea", "editable": True},
+    "Net Amount (INR)": {"type": "number", "editable": True},
+    "VAT Rate (%)": {"type": "select", "options": [0, 5, 10, 15], "editable": True},
+    "VAT Amount (INR)": {"type": "number", "editable": False}, # Calculated
+    "Total Amount (INR)": {"type": "number", "editable": False}, # Calculated
+    "Supplier/Client Name": {"type": "text", "editable": True},
+    "Supplier/Client TRN": {"type": "text", "editable": True},
+    "Invoice/Receipt Number": {"type": "text", "editable": True},
+    "Notes": {"type": "textarea", "editable": True},
+}
+
+MODULE_CONFIGS = {
+    "Trip Management": {"collection": "trips", "fields": TRIP_MANAGEMENT_FIELDS},
+    "Rental Management": {"collection": "rentals", "fields": RENTAL_MANAGEMENT_FIELDS},
+    "Fleet Management": {"collection": "vehicles", "fields": FLEET_MANAGEMENT_FIELDS},
+    "Invoicing & Quoting": {"collection": "invoices", "fields": INVOICING_QUOTING_FIELDS},
+    "CRM Management": {"collection": "clients", "fields": CRM_MANAGEMENT_FIELDS},
+    "Employee Management": {"collection": "employees", "fields": EMPLOYEE_MANAGEMENT_FIELDS},
+    "Payroll": {"collection": "payslips", "fields": PAYROLL_FIELDS},
+    "Planning & Time Off": {"collection": "leaves", "fields": PLANNING_TIMEOFF_FIELDS},
+    "VAT Input/Output": {"collection": "vat_transactions", "fields": VAT_INPUT_OUTPUT_FIELDS},
+}
+
+
+def load_data(company_id, module_name):
+    collection_name = MODULE_CONFIGS[module_name]["collection"]
+    df = firestore_get_collection(company_id, collection_name)
+    return df
+
+def save_data(company_id, module_name, df):
+    collection_name = MODULE_CONFIGS[module_name]["collection"]
     
-    if not df_copy.empty:
-        df_copy.insert(0, 'SL No', range(1, len(df_copy) + 1))
-    return df_copy
+    # Identify documents to add/update/delete by comparing with original state (if available)
+    # This is a simplified approach. For robust sync, you might track changes more granularly.
+
+    # Get current Firestore data to compare
+    current_firestore_df = firestore_get_collection(company_id, collection_name)
+    current_firestore_ids = set(current_firestore_df['doc_id'].dropna().tolist()) if not current_firestore_df.empty else set()
+    
+    # Identify IDs present in the current Streamlit DataFrame
+    st_df_ids = set(df['doc_id'].dropna().tolist()) if not df.empty else set()
+
+    # Documents to delete (present in Firestore but not in Streamlit's DataFrame)
+    to_delete_ids = current_firestore_ids - st_df_ids
+    for doc_id in to_delete_ids:
+        firestore_delete_document(company_id, collection_name, doc_id)
+
+    # Documents to add/update
+    for index, row in df.iterrows():
+        record_data = row.drop(labels=['doc_id']).to_dict()
+        
+        # Ensure correct data types for numbers before saving to Firestore
+        for field_name, field_config in MODULE_CONFIGS[module_name]["fields"].items():
+            if field_config['type'] == 'number' and field_name in record_data and record_data[field_name] is not None:
+                try:
+                    record_data[field_name] = float(record_data[field_name])
+                except (ValueError, TypeError):
+                    record_data[field_name] = 0.0 # Default to 0.0 if conversion fails
+
+        # Handle 'Company' column explicitly to ensure it's set
+        if 'Company' not in record_data or record_data['Company'] is None:
+            record_data['Company'] = st.session_state['company_name']
+
+        if pd.isna(row['doc_id']): # New record, add it
+            firestore_add_document(company_id, collection_name, record_data)
+        else: # Existing record, update it
+            firestore_update_document(company_id, collection_name, row['doc_id'], record_data)
+    st.success(f"{module_name} data saved to Firestore!")
+    st.session_state[f'df_{collection_name}'] = load_data(company_id, module_name) # Reload after save
+    return True
 
 
-def display_module(module_name, fields_config, collection_name_in_db, crud_enabled=True, company_filter_id=None):
-    """
-    Displays a module with CRUD operations, search, and report generation.
-    Handles data persistence to SQLite and UI updates.
-    """
-    actual_company_id_for_filter = company_filter_id if company_filter_id else st.session_state['company_id']
-    actual_company_name_for_filter = None
-    for comp_id, comp_details in st.session_state['USER_DB'].items():
-        if comp_id == actual_company_id_for_filter:
-            actual_company_name_for_filter = comp_details['company_name']
+def apply_calculations(df, module_name):
+    """Applies specific calculations based on the module."""
+    if df.empty:
+        return df
+
+    if module_name == "Rental Management":
+        if "Start Date & Time" in df.columns and "End Date & Time" in df.columns and "Rental Rate per Day (INR)" in df.columns:
+            df["Start Date & Time"] = pd.to_datetime(df["Start Date & Time"], errors='coerce')
+            df["End Date & Time"] = pd.to_datetime(df["End Date & Time"], errors='coerce')
+            df["Rental Rate per Day (INR)"] = pd.to_numeric(df["Rental Rate per Day (INR)"], errors='coerce').fillna(0)
+
+            valid_dates_mask = df["Start Date & Time"].notna() & df["End Date & Time"].notna()
+            
+            # Calculate duration in days, ensure it's at least 1 day for rentals
+            duration = (df["End Date & Time"] - df["Start Date & Time"]).dt.days + 1
+            duration = duration.apply(lambda x: max(x, 1) if pd.notna(x) else 0)
+
+            df.loc[valid_dates_mask, "Total Rental Cost (INR)"] = \
+                duration[valid_dates_mask] * df.loc[valid_dates_mask, "Rental Rate per Day (INR)"]
+            df["Total Rental Cost (INR)"] = df["Total Rental Cost (INR)].fillna(0)"]
+
+
+    elif module_name == "Invoicing & Quoting":
+        if "Items" in df.columns and "Discount" in df.columns and "VAT Rate" in df.columns:
+            df["Discount"] = pd.to_numeric(df["Discount"], errors='coerce').fillna(0)
+            df["VAT Rate"] = pd.to_numeric(df["VAT Rate"], errors='coerce').fillna(0) / 100 # Convert to decimal
+
+            # Calculate Subtotal from Items
+            subtotals = []
+            for _, row in df.iterrows():
+                row_subtotal = 0
+                items_json_str = row['Items']
+                try:
+                    items = json.loads(items_json_str) if isinstance(items_json_str, str) else items_json_str
+                    if isinstance(items, list):
+                        for item in items:
+                            try:
+                                qty = float(item.get('Quantity', 0))
+                                price = float(item.get('Unit Price', 0))
+                                row_subtotal += (qty * price)
+                            except (ValueError, TypeError):
+                                pass # Skip invalid item data
+                except (json.JSONDecodeError, TypeError):
+                    pass # Skip if Items is not valid JSON or not a list
+
+                subtotals.append(row_subtotal)
+            df['Subtotal'] = subtotals
+
+            df["VAT Amount"] = (df["Subtotal"] - df["Discount"]) * df["VAT Rate"]
+            df["Total Amount"] = df["Subtotal"] - df["Discount"] + df["VAT Amount"]
+            df["VAT Amount"] = df["VAT Amount"].fillna(0)
+            df["Total Amount"] = df["Total Amount"].fillna(0)
+
+    elif module_name == "Payroll":
+        if "Basic Salary (INR)" in df.columns and "Allowance (INR)" in df.columns and "Overtime Pay (INR)" in df.columns and "Deductions (INR)" in df.columns:
+            df["Basic Salary (INR)"] = pd.to_numeric(df["Basic Salary (INR)"], errors='coerce').fillna(0)
+            df["Allowance (INR)"] = pd.to_numeric(df["Allowance (INR)"], errors='coerce').fillna(0)
+            df["Overtime Pay (INR)"] = pd.to_numeric(df["Overtime Pay (INR)"], errors='coerce').fillna(0)
+            df["Deductions (INR)"] = pd.to_numeric(df["Deductions (INR)"], errors='coerce').fillna(0)
+            
+            df["Gross Salary (INR)"] = df["Basic Salary (INR)"] + df["Allowance (INR)"] + df["Overtime Pay (INR)"]
+            df["Net Salary (INR)"] = df["Gross Salary (INR)"] - df["Deductions (INR)"]
+            df["Gross Salary (INR)"] = df["Gross Salary (INR)"].fillna(0)
+            df["Net Salary (INR)"] = df["Net Salary (INR)"].fillna(0)
+
+    elif module_name == "Planning & Time Off":
+        if "Start Date" in df.columns and "End Date" in df.columns:
+            df["Start Date"] = pd.to_datetime(df["Start Date"], errors='coerce')
+            df["End Date"] = pd.to_datetime(df["End Date"], errors='coerce')
+
+            valid_dates_mask = df["Start Date"].notna() & df["End Date"].notna()
+            df.loc[valid_dates_mask, "Number of Days"] = (df["End Date"] - df["Start Date"]).dt.days + 1
+            df["Number of Days"] = df["Number of Days"].fillna(0)
+
+    elif module_name == "VAT Input/Output":
+        if "Net Amount (INR)" in df.columns and "VAT Rate (%)" in df.columns:
+            df["Net Amount (INR)"] = pd.to_numeric(df["Net Amount (INR)"], errors='coerce').fillna(0)
+            df["VAT Rate (%)"] = pd.to_numeric(df["VAT Rate (%)"], errors='coerce').fillna(0) / 100 # Convert to decimal
+
+            df["VAT Amount (INR)"] = df["Net Amount (INR)"] * df["VAT Rate (%)"]
+            df["Total Amount (INR)"] = df["Net Amount (INR)"] + df["VAT Amount (INR)"]
+            df["VAT Amount (INR)"] = df["VAT Amount (INR)"].fillna(0)
+            df["Total Amount (INR)"] = df["Total Amount (INR)"].fillna(0)
+
+    return df
+
+def get_next_id(df, id_prefix):
+    """Generates the next sequential ID based on existing IDs in the DataFrame."""
+    if df.empty or not any(col.startswith(id_prefix) for col in df.columns):
+        return f"{id_prefix}001"
+    
+    # Find the column that starts with the ID prefix
+    id_col = None
+    for col in df.columns:
+        if col.startswith(id_prefix):
+            id_col = col
             break
-    if not actual_company_name_for_filter:
-        st.error("Error: Could not determine company name for the selected company ID.")
-        return
+            
+    if id_col is None: # Fallback if ID column not found, though it should be if data exists
+        return f"{id_prefix}001"
 
-    # Fetch data from SQLite
-    current_company_data = get_db_collection(actual_company_id_for_filter, collection_name_in_db)
+    existing_ids = df[id_col].dropna().astype(str)
+    if existing_ids.empty:
+        return f"{id_prefix}001"
 
-    with st.expander(f"**{module_name} Management**"):
-        if crud_enabled:
-            st.subheader("Add New Entry")
-            # Initialize or retrieve widget values from session state for persistence across reruns
-            session_state_key_for_add_form = f'add_new_entry_values_{collection_name_in_db}_{actual_company_id_for_filter}'
-            if session_state_key_for_add_form not in st.session_state:
-                st.session_state[session_state_key_for_add_form] = {}
-                for field, config in fields_config.items():
-                    if config['type'] == 'text':
-                        st.session_state[session_state_key_for_add_form][field] = ""
-                    elif config['type'] == 'number':
-                        st.session_state[session_state_key_for_add_form][field] = 0.0
-                    elif config['type'] == 'date':
-                        st.session_state[session_state_key_for_add_form][field] = datetime.date.today()
-                    elif config['type'] == 'datetime':
-                        st.session_state[session_state_key_for_add_form][field] = datetime.datetime.combine(datetime.date.today(), datetime.time(8,0))
-                    elif config['type'] == 'select':
-                        st.session_state[session_state_key_for_add_form][field] = '--- Select ---'
-                    elif config['type'] == 'checkbox':
-                        st.session_state[session_state_key_for_add_form][field] = False
-                    elif config['type'] == 'file':
-                        st.session_state[session_state_key_for_add_form][field] = None
+    # Extract numerical part and find max
+    max_num = 0
+    for an_id in existing_ids:
+        try:
+            # Handle IDs like "TRP001", "INV-2023-005"
+            # Extract numbers from string using regex or simple split after prefix
+            num_part = ''.join(filter(str.isdigit, an_id))
+            if num_part:
+                max_num = max(max_num, int(num_part))
+        except ValueError:
+            continue # Ignore IDs that don't conform to expected pattern
 
-            new_entry_data_input = {}
-            for field, config in fields_config.items():
-                widget_key = f"{actual_company_id_for_filter}_{module_name}_add_{field}"
-
-                # Special handling for auto-generated IDs - skip input
-                if module_name == "Trip" and field == "Trip ID": continue
-                if module_name == "Rental" and field == "Rental ID": continue
-                if module_name == "Invoicing & Quoting" and (field == "Inv Number" or field == "SI No"): continue
-                if module_name == "Payroll" and field == "Payslip ID": continue
-                # Also skip Net Salary, it's calculated
-                if module_name == "Payroll" and field == "Net Salary": continue
-
-                current_value = st.session_state[session_state_key_for_add_form].get(field)
-
-                if config['type'] == 'text':
-                    new_entry_data_input[field] = st.text_input(field, value=current_value, placeholder=f"Enter {field}", key=widget_key)
-                elif config['type'] == 'number':
-                    # Ensure value is float, default to 0.0 if None
-                    new_entry_data_input[field] = st.number_input(field, value=float(current_value if current_value is not None else 0.0), key=widget_key)
-                elif config['type'] == 'date':
-                    # Ensure value is datetime.date, default to today if None
-                    new_entry_data_input[field] = st.date_input(field, value=current_value if current_value is not None else datetime.date.today(), key=widget_key)
-                elif config['type'] == 'datetime':
-                    # Split datetime into date and time inputs for granular control
-                    date_val_add = st.date_input(
-                        f"{field} Date", 
-                        value=current_value.date() if isinstance(current_value, datetime.datetime) else datetime.date.today(), 
-                        key=f"{widget_key}_date"
-                    )
-                    time_val_add = st.time_input(
-                        f"{field} Time", 
-                        value=current_value.time() if isinstance(current_value, datetime.datetime) else datetime.time(8,0), 
-                        key=f"{widget_key}_time"
-                    )
-                    
-                    if date_val_add and time_val_add:
-                        new_entry_data_input[field] = datetime.datetime.combine(date_val_add, time_val_add)
-                    else:
-                        new_entry_data_input[field] = None
-                elif config['type'] == 'select':
-                    options_with_placeholder = ['--- Select ---'] + config['options']
-                    default_index = options_with_placeholder.index(current_value) if current_value in options_with_placeholder else 0
-                    new_entry_data_input[field] = st.selectbox(field, options=options_with_placeholder, index=default_index, key=widget_key)
-                elif config['type'] == 'checkbox':
-                    new_entry_data_input[field] = st.checkbox(field, value=current_value, key=widget_key)
-                elif config['type'] == 'file':
-                    new_entry_data_input[field] = st.file_uploader(field, key=widget_key)
+    return f"{id_prefix}{max_num + 1:03d}" # Format with leading zeros
 
 
-            if st.button(f"Add {module_name} Entry", key=f"{actual_company_id_for_filter}_{module_name}_add_button"):
-                entry_to_add = {}
+# --- User Authentication ---
+def login():
+    st.sidebar.title("Login")
+    company_name_input = st.sidebar.selectbox("Select Company", options=list(st.session_state['USER_DB'].keys()))
+    username = st.sidebar.text_input("Username")
+    password = st.sidebar.text_input("Password", type="password")
 
-                # Handle auto-generation for specific IDs
-                if module_name == "Trip":
-                    entry_to_add['Trip ID'] = f"TRP-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-                elif module_name == "Rental":
-                    entry_to_add['Rental ID'] = f"RNT-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-                elif module_name == "Invoicing & Quoting":
-                    entry_to_add['Inv Number'] = f"INV-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-                    entry_to_add['SI No'] = f"SI-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-                elif module_name == "Payroll":
-                    entry_to_add['Payslip ID'] = f"PS-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
+    if st.sidebar.button("Login"):
+        company_data = st.session_state['USER_DB'].get(company_name_input)
+        if company_data:
+            user_data = company_data["users"].get(username)
+            if user_data and bcrypt.checkpw(password.encode('utf-8'), user_data["password_hash"].encode('utf-8')):
+                st.session_state['logged_in'] = True
+                st.session_state['company_id'] = company_name_input # Use company name as ID for Firestore document
+                st.session_state['user_id'] = username
+                st.session_state['company_name'] = company_data['company_name']
+                st.session_state['role'] = user_data['role']
+                st.success(f"Logged in as {username} for {company_data['company_name']}")
+                st.rerun()
+            else:
+                st.sidebar.error("Invalid Username or Password.")
+        else:
+            st.sidebar.error("Company not found.")
 
-                # Calculate Net Salary for Payroll module
-                if module_name == "Payroll":
-                    base_salary = new_entry_data_input.get('Base Salary', 0.0)
-                    trip_bonus = new_entry_data_input.get('Trip Bonus', 0.0)
-                    rental_commission = new_entry_data_input.get('Rental Commission', 0.0)
-                    deductions = new_entry_data_input.get('Deductions', 0.0)
-                    overtime = new_entry_data_input.get('Overtime', 0.0)
-                    entry_to_add['Net Salary'] = base_salary + trip_bonus + rental_commission + overtime - deductions
-                
-                for field, value in new_entry_data_input.items():
-                    if field.endswith(" Date") or field.endswith(" Time"): # Skip partial datetime fields
-                        continue
-                    # Only add if it's not the calculated Net Salary (which is handled above)
-                    if not (module_name == "Payroll" and field == "Net Salary"):
-                        entry_to_add[field] = value
+def logout():
+    st.session_state['logged_in'] = False
+    st.session_state['company_id'] = None
+    st.session_state['user_id'] = None
+    st.session_state['company_name'] = None
+    st.session_state['role'] = None
+    st.session_state['admin_selected_company_for_modules_name'] = None # Clear this on logout
+    st.info("Logged out successfully.")
+    st.rerun()
 
-                # Handle file uploads (store just the name/path)
-                for field, config in fields_config.items():
-                    if config['type'] == 'file' and new_entry_data_input.get(field):
-                        entry_to_add[field] = new_entry_data_input[field].name
-                
-                add_db_document(actual_company_id_for_filter, collection_name_in_db, entry_to_add)
-                st.success(f"{module_name} entry added successfully for {actual_company_name_for_filter}!")
-                # Reset input fields in session state after successful add
-                st.session_state[session_state_key_for_add_form] = {} # Clear all for the next rerun
-                st.rerun() # Force rerun to clear form fields
+# --- Admin Functionality ---
+def admin_user_management():
+    st.header("Admin User Management")
+    st.write("Manage users and their associated companies.")
 
+    st.subheader("Add/Edit User")
+    with st.form("add_edit_user_form"):
+        # Select existing company or add new
+        company_options = list(st.session_state['USER_DB'].keys())
+        selected_company_for_user_ops = st.selectbox("Select Company (for user operations)", options=company_options + ["Add New Company..."])
 
-        st.subheader(f"Existing {module_name} Entries")
+        new_company_name = ""
+        new_company_pin = ""
+        if selected_company_for_user_ops == "Add New Company...":
+            new_company_name = st.text_input("New Company Name (e.g., 'NEW CARGO W.L.L')")
+            new_company_pin = st.text_input("New Company PIN (e.g., 'NEW CARGO W.L.L')")
 
-        # Search and Filter
-        search_term = st.text_input(f"Search {module_name} for {actual_company_name_for_filter}", key=f"{actual_company_id_for_filter}_{module_name}_search", placeholder="Type to search...")
+        user_to_edit = st.selectbox("Select User (to edit or type new)", options=["(New User)"] + list(st.session_state['USER_DB'].get(selected_company_for_user_ops, {}).get('users', {}).keys()))
         
-        filtered_df = current_company_data
-
-        if search_term:
-            filtered_df = filtered_df[
-                filtered_df.astype(str).apply(lambda row: row.str.contains(search_term, case=False, na=False).any(), axis=1)
-            ]
-
-        # Display data with SL No and allow editing
-        display_df_with_slno = add_serial_numbers(filtered_df.drop(columns=['doc_id', 'company_id'], errors='ignore')) # Drop doc_id and company_id for display
-
-        if crud_enabled:
-            edited_df = st.data_editor(
-                display_df_with_slno,
-                key=f"{actual_company_id_for_filter}_{module_name}_data_editor",
-                hide_index=True,
-                num_rows="dynamic",
-                use_container_width=True
-            )
-
-            updated_count = 0
-            deleted_count = 0
-            added_count = 0
-
-            # Convert current_company_data to a dictionary keyed by doc_id for efficient lookup
-            original_data_by_doc_id = {row['doc_id']: row for _, row in current_company_data.iterrows()}
-
-            # 1. Identify deleted rows (rows in original but not in edited_df by doc_id)
-            edited_doc_ids_in_data = set(edited_df['doc_id'].dropna().tolist()) if 'doc_id' in edited_df.columns else set()
-            original_doc_ids = set(original_data_by_doc_id.keys())
-            deleted_doc_ids = original_doc_ids - edited_doc_ids_in_data
-
-            for doc_id_to_delete in deleted_doc_ids:
-                if delete_db_document(actual_company_id_for_filter, collection_name_in_db, doc_id_to_delete):
-                    deleted_count += 1
-
-            # 2. Identify new or updated rows
-            for index, row_data_from_editor in edited_df.iterrows():
-                row_doc_id = row_data_from_editor.get('doc_id')
-                
-                # Prepare data: remove 'SL No', 'doc_id', convert NaNs to None, and handle selectbox
-                cleaned_edited_data = {}
-                for k, v in row_data_from_editor.items():
-                    if k not in ['SL No', 'doc_id', 'company_id']: # Also exclude company_id from edited data
-                        # Convert Streamlit's internal representation back to standard Python types
-                        if fields_config.get(k, {}).get('type') == 'date' and isinstance(v, datetime.date):
-                            cleaned_edited_data[k] = v.isoformat()
-                        elif fields_config.get(k, {}).get('type') == 'datetime' and isinstance(v, datetime.datetime):
-                            cleaned_edited_data[k] = v.isoformat(sep=' ')
-                        elif fields_config.get(k, {}).get('type') == 'checkbox':
-                            cleaned_edited_data[k] = 1 if v else 0 # Convert bool to int for SQLite
-                        elif fields_config.get(k, {}).get('type') == 'select' and v == '--- Select ---':
-                            cleaned_edited_data[k] = None
-                        elif pd.isna(v): # Handle pandas NaNs
-                            cleaned_edited_data[k] = None
-                        else:
-                            cleaned_edited_data[k] = v
-
-                # Recalculate Net Salary if it's the Payroll module
-                if module_name == "Payroll":
-                    base_salary = cleaned_edited_data.get('Base Salary', 0.0)
-                    trip_bonus = cleaned_edited_data.get('Trip Bonus', 0.0)
-                    rental_commission = cleaned_edited_data.get('Rental Commission', 0.0)
-                    deductions = cleaned_edited_data.get('Deductions', 0.0)
-                    overtime = cleaned_edited_data.get('Overtime', 0.0)
-                    cleaned_edited_data['Net Salary'] = base_salary + trip_bonus + rental_commission + overtime - deductions
-
-
-                if pd.isna(row_doc_id) or row_doc_id is None: # This is a new row added via data_editor
-                    # Fill in default values for new rows for fields that might be empty
-                    for field_name, field_cfg in fields_config.items():
-                        if field_name not in cleaned_edited_data or cleaned_edited_data[field_name] is None:
-                            # Skip auto-generated IDs or calculated fields
-                            if field_name in ['Trip ID', 'Rental ID', 'Inv Number', 'SI No', 'Payslip ID', 'Net Salary']:
-                                continue
-                            if field_cfg['type'] == 'text':
-                                cleaned_edited_data[field_name] = ""
-                            elif field_cfg['type'] == 'number':
-                                cleaned_edited_data[field_name] = 0.0
-                            elif field_cfg['type'] == 'date':
-                                cleaned_edited_data[field_name] = datetime.date.today().isoformat()
-                            elif field_cfg['type'] == 'datetime':
-                                cleaned_edited_data[field_name] = datetime.datetime.now().isoformat(sep=' ')
-                            elif field_cfg['type'] == 'select':
-                                cleaned_edited_data[field_name] = field_cfg['options'][0] if field_cfg['options'] else None
-                            elif field_cfg['type'] == 'checkbox':
-                                cleaned_edited_data[field_name] = False
-
-                    if 'Company' not in cleaned_edited_data:
-                        cleaned_edited_data['Company'] = actual_company_name_for_filter
-                    
-                    # Auto-generate IDs for new rows
-                    if module_name == "Trip":
-                        cleaned_edited_data['Trip ID'] = f"TRP-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-                    elif module_name == "Rental":
-                        cleaned_edited_data['Rental ID'] = f"RNT-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-                    elif module_name == "Invoicing & Quoting":
-                        cleaned_edited_data['Inv Number'] = f"INV-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-                        cleaned_edited_data['SI No'] = f"SI-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-                    elif module_name == "Payroll":
-                        cleaned_edited_data['Payslip ID'] = f"PS-{datetime.datetime.now().strftime('%Y%m%d%H%M%S%f')}"
-
-                    if add_db_document(actual_company_id_for_filter, collection_name_in_db, cleaned_edited_data):
-                        added_count += 1
-
-                elif row_doc_id in original_doc_ids: # This is an existing row, check for updates
-                    original_row_data = original_data_by_doc_id[row_doc_id]
-                    # Compare only relevant fields, exclude 'SL No', 'doc_id', 'company_id' for comparison
-                    cleaned_original_data_for_compare = {k: v for k, v in original_row_data.items() if k not in ['SL No', 'doc_id', 'company_id']}
-                    
-                    if cleaned_edited_data != cleaned_original_data_for_compare: # Compare cleaned data
-                        if update_db_document(actual_company_id_for_filter, collection_name_in_db, row_doc_id, cleaned_edited_data):
-                            updated_count += 1
-
-            # Only rerun if actual changes were made to avoid infinite loops
-            if updated_count > 0 or deleted_count > 0 or added_count > 0:
-                if updated_count > 0:
-                    st.success(f"{updated_count} {module_name} entries updated!")
-                if deleted_count > 0:
-                    st.success(f"{deleted_count} {module_name} entries deleted!")
-                if added_count > 0:
-                    st.success(f"{added_count} new {module_name} entries added!")
-                st.rerun() # Force rerun to refresh UI
-
-        else: # If CRUD is not enabled, just display the dataframe
-            st.dataframe(display_df_with_slno, use_container_width=True, hide_index=True)
-
-        # --- Invoice PDF Generation for Invoicing & Quoting module ---
-        if module_name == "Invoicing & Quoting":
-            st.subheader(f"Generate Specific Tax Invoice for {actual_company_name_for_filter}")
-            
-            logo_x_pos = 10
-            logo_y_pos = 10
-            logo_width_fixed = 50
-            logo_height_fixed = 30
-            
-            logo_url_input = "https://i.ibb.co/RGTCjMb4/EAST-CONCORD-W-L-L-page-0001-1.jpg"
-
-            invoice_options = filtered_df['Inv Number'].dropna().tolist() # Ensure no NaNs in options
-            if invoice_options:
-                selected_invoice_number = st.selectbox(
-                    "Select an Invoice to Generate PDF:",
-                    ['--- Select Invoice ---'] + invoice_options,
-                    key=f"{actual_company_id_for_filter}_select_invoice_for_pdf"
-                )
-
-                if selected_invoice_number and selected_invoice_number != '--- Select Invoice ---':
-                    selected_invoice_data = filtered_df[filtered_df['Inv Number'] == selected_invoice_number].iloc[0].to_dict()
-                    company_profile_for_invoice = COMPANY_PROFILES.get(actual_company_name_for_filter)
-
-                    if company_profile_for_invoice:
-                        if st.button(f"Download Tax Invoice PDF for {selected_invoice_number}", key=f"{actual_company_id_for_filter}_{selected_invoice_number}_invoice_pdf_download"):
-                            tax_invoice_pdf_data = generate_single_tax_invoice_pdf(
-                                selected_invoice_data,
-                                company_profile_for_invoice,
-                                logo_url=logo_url_input,
-                                logo_x=logo_x_pos,
-                                logo_y=logo_y_pos,
-                                logo_width=logo_width_fixed,
-                                logo_height=logo_height_fixed
-                            )
-                            st.download_button(
-                                label=f"Download Invoice {selected_invoice_number} PDF",
-                                data=tax_invoice_pdf_data,
-                                file_name=f"Tax_Invoice_{selected_invoice_number}.pdf",
-                                mime="application/pdf",
-                                key=f"{actual_company_id_for_filter}_{selected_invoice_number}_pdf_download_final"
-                            )
-                            st.success(f"Tax Invoice PDF for {selected_invoice_number} generated successfully!")
-                    else:
-                        st.error(f"Company profile for '{actual_company_name_for_filter}' not found for invoice generation. Please ensure company profile is defined in COMPANY_PROFILES.")
-                else:
-                    st.info("Please select an invoice to generate its PDF.")
-            else:
-                st.info("No invoices available for PDF generation. Please add invoice entries first.")
-        # --- End of New Invoice PDF Generation ---
-
-        st.subheader(f"Download {module_name} Reports for {actual_company_name_for_filter}")
-        col1, col2 = st.columns(2)
-        with col1:
-            excel_data = generate_excel_report(current_company_data.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{module_name}_Report_{actual_company_name_for_filter}")
-            st.download_button(
-                label=f"Download {module_name} Excel ({actual_company_name_for_filter})",
-                data=excel_data,
-                file_name=f"{module_name}_Report_{actual_company_name_for_filter}_{datetime.date.today()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"{actual_company_id_for_filter}_{module_name}_excel_download"
-            )
-        with col2:
-            pdf_data = generate_pdf_report(current_company_data.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{module_name} Report for {actual_company_name_for_filter}")
-            st.download_button(
-                label=f"Download {module_name} PDF ({actual_company_name_for_filter})",
-                data=pdf_data,
-                file_name=f"Report_{module_name}_Report_{actual_company_name_for_filter}_{datetime.date.today()}.pdf",
-                mime="application/pdf",
-                key=f"{actual_company_id_for_filter}_{module_name}_pdf_download"
-            )
-
-        st.markdown("---")
-        st.info(f"Note: Data for {module_name} is persisted in SQLite database. Data might be lost on ephemeral deployments.")
-
-
-# --- Authentication and Main App Flow ---
-
-def login_page():
-    st.title("Logistic Management System")
-    st.image("https://placehold.co/600x150/EEEEEE/313131?text=Your+Company+Logo", use_container_width=True)
-    st.markdown("---")
-    st.subheader("Login to Your Company Account")
-
-    # Fetch users from SQLite
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("SELECT company_id, company_name, username, password_hash, role FROM users")
-        db_users_raw = cursor.fetchall()
-    except Exception as e:
-        st.error(f"Error fetching users from database: {e}. Please try refreshing the app. This might indicate database initialization issues.")
-        db_users_raw = []
-    finally:
-        conn.close()
-
-    # Reconstruct a USER_DB-like structure from SQLite for login purposes
-    current_user_db_from_sql = {}
-    for row in db_users_raw:
-        company_id = row['company_id']
-        company_name = row['company_name']
-        username = row['username']
-        password_hash = row['password_hash']
-        role = row['role']
-
-        if company_id not in current_user_db_from_sql:
-            current_user_db_from_sql[company_id] = {
-                "company_name": company_name,
-                # Get PIN from initial structure (or retrieve from DB if stored there)
-                "company_pin": next((INITIAL_USER_DB_STRUCTURE.get(cid, {}).get('company_pin') for cid, cdata in INITIAL_USER_DB_STRUCTURE.items() if cdata['company_name'] == company_name), ''),
-                "users": {}
-            }
-        current_user_db_from_sql[company_id]['users'][username] = {
-            "password_hash": password_hash,
-            "role": role
-        }
-    
-    st.session_state['USER_DB'] = current_user_db_from_sql # Update session state with current DB users
-
-    with st.form(key="main_login_form"):
-        # Ensure company_names are from the dynamically loaded users, not just initial structure
-        company_names = sorted(list(set([details['company_name'] for details in st.session_state['USER_DB'].values()])))
-        
-        # Add a default empty option for the selectbox
-        selected_company_name = st.selectbox("Select Your Company", options=['--- Select Company ---'] + company_names, key="login_company_select")
-
-        selected_company_id = None
-        if selected_company_name != '--- Select Company ---':
-            for comp_id, comp_details in st.session_state['USER_DB'].items():
-                if comp_details['company_name'] == selected_company_name:
-                    selected_company_id = comp_id
-                    break
-
-        username = st.text_input("Username", key="login_username", placeholder="Enter your username")
-        password = st.text_input("Password", type="password", key="login_password", placeholder="Enter your password")
-        
-        login_button = st.form_submit_button("Login")
-
-        if login_button:
-            if selected_company_id and username and password:
-                if selected_company_id in st.session_state['USER_DB']:
-                    users_in_company = st.session_state['USER_DB'][selected_company_id]['users']
-                    if username in users_in_company:
-                        stored_password_hash = users_in_company[username]['password_hash']
-                        if bcrypt.checkpw(password.encode('utf-8'), stored_password_hash.encode('utf-8')):
-                            st.session_state['logged_in'] = True
-                            st.session_state['company_id'] = selected_company_id
-                            st.session_state['user_id'] = username
-                            st.session_state['company_name'] = selected_company_name
-                            st.session_state['role'] = users_in_company[username]['role']
-                            st.success(f"Logged in as {username} for {st.session_state['company_name']}!")
-                            st.rerun()
-                        else:
-                            st.error("Invalid Username or Password.")
-                    else:
-                        st.error("Invalid Username or Password.")
-                else:
-                    st.error("Company not found in database. This should not happen if initialization was successful.")
-            else:
-                st.error("Please select a company and enter username/password.")
-
-
-def main_app():
-    USER_DB_CURRENT = st.session_state['USER_DB']
-
-    if st.session_state['role'] == 'admin':
-        st.sidebar.title("Management Dashboard")
-        st.sidebar.write(f"Logged in as: {st.session_state['user_id']}")
-        st.sidebar.write("Role: **Admin**")
-
-        menu_options = ["Overall Dashboard", "Analysis Dashboard", "Cross-Company Reports", "User & Company Management", "View Company Modules"]
-        
-        if st.session_state.get('set_admin_nav_to_view_modules'):
-            st.session_state['admin_nav'] = "View Company Modules"
-            del st.session_state['set_admin_nav_to_view_modules']
-
-        if 'admin_nav' not in st.session_state:
-            st.session_state['admin_nav'] = "Overall Dashboard"
-
-        menu_selection = st.sidebar.radio(
-            "Navigation",
-            options=menu_options,
-            key="admin_nav"
-        )
-
-        total_companies_count = 0
-        total_vehicles_all = 0
-        total_employees_all = 0
-        total_revenue_all = 0.0
-        total_trips_all = 0
-        total_rentals_all = 0
-        total_payslips_net_salary_all = 0.0
-        total_leaves_all = 0
-        total_vat_amount_all = 0.0
-
-        all_companies_operational_data = {}
-        # Filter out the 'management_company' (admin) from operational data
-        operational_company_ids = [comp_id for comp_id, details in USER_DB_CURRENT.items() if details['company_pin'] != 'ADMIN']
-
-        for module_name_key in MODULE_FIELDS_MAP.keys():
-            combined_module_df = pd.DataFrame()
-            for comp_id in operational_company_ids:
-                df_for_comp = get_db_collection(comp_id, module_name_key)
-                if not df_for_comp.empty:
-                    combined_module_df = pd.concat([combined_module_df, df_for_comp], ignore_index=True)
-            all_companies_operational_data[module_name_key] = combined_module_df
-
-
-        for company_id_key, company_details in USER_DB_CURRENT.items():
-            if company_details['company_pin'] != 'ADMIN':
-                total_companies_count += 1
-                comp_name = company_details['company_name']
-                
-                if 'vehicles' in all_companies_operational_data and 'Company' in all_companies_operational_data['vehicles'].columns:
-                    comp_vehicles_df = all_companies_operational_data['vehicles'][all_companies_operational_data['vehicles']['Company'] == comp_name]
-                    total_vehicles_all += len(comp_vehicles_df)
-
-                if 'employees' in all_companies_operational_data and 'Company' in all_companies_operational_data['employees'].columns:
-                    comp_employees_df = all_companies_operational_data['employees'][all_companies_operational_data['employees']['Company'] == comp_name]
-                    total_employees_all += len(comp_employees_df)
-
-                if 'invoices' in all_companies_operational_data and 'Company' in all_companies_operational_data['invoices'].columns:
-                    comp_invoices_df = all_companies_operational_data['invoices'][all_companies_operational_data['invoices']['Company'] == comp_name]
-                    total_revenue_all += comp_invoices_df['Total Amount'].sum() if 'Total Amount' in comp_invoices_df.columns else 0.0
-
-                if 'trips' in all_companies_operational_data and 'Company' in all_companies_operational_data['trips'].columns:
-                    comp_trips_df = all_companies_operational_data['trips'][all_companies_operational_data['trips']['Company'] == comp_name]
-                    total_trips_all += len(comp_trips_df)
-
-                if 'rentals' in all_companies_operational_data and 'Company' in all_companies_operational_data['rentals'].columns:
-                    total_rentals_all += len(all_companies_operational_data['rentals'][all_companies_operational_data['rentals']['Company'] == comp_name])
-
-                if 'payslips' in all_companies_operational_data and 'Company' in all_companies_operational_data['payslips'].columns:
-                    total_payslips_net_salary_all += all_companies_operational_data['payslips'][all_companies_operational_data['payslips']['Company'] == comp_name]['Net Salary'].sum() if 'Net Salary' in all_companies_operational_data['payslips'].columns else 0.0
-                
-                if 'leaves' in all_companies_operational_data and 'Company' in all_companies_operational_data['leaves'].columns:
-                    total_leaves_all += len(all_companies_operational_data['leaves'][all_companies_operational_data['leaves']['Company'] == comp_name])
-
-                if 'vat_transactions' in all_companies_operational_data and 'Company' in all_companies_operational_data['vat_transactions'].columns:
-                    total_vat_amount_all += all_companies_operational_data['vat_transactions'][all_companies_operational_data['vat_transactions']['Company'] == comp_name]['VAT Amount'].sum() if 'VAT Amount' in all_companies_operational_data['vat_transactions'].columns else 0.0
-
-        st.title("Admin / Management Dashboard")
-        if menu_selection == "Overall Dashboard":
-            st.subheader("Key Performance Indicators Across All Companies")
-            
-            col_comp, col_v, col_e, col_r = st.columns(4)
-            with col_comp:
-                st.metric("Total Companies", total_companies_count)
-            with col_v:
-                st.metric("Total Vehicles", total_vehicles_all)
-            with col_e:
-                st.metric("Total Employees", total_employees_all)
-            with col_r:
-                st.metric("Total Revenue", f"INR {total_revenue_all:,.2f}")
-
-            st.markdown("---")
-            st.subheader("Aggregated Module Statistics (All Companies)")
-
-            col_t, col_rent, col_pay = st.columns(3)
-            with col_t:
-                st.metric("Total Trips", total_trips_all)
-            with col_rent:
-                st.metric("Total Rentals", total_rentals_all)
-            with col_pay:
-                st.metric("Total Net Salary Paid", f"INR {total_payslips_net_salary_all:,.2f}")
-            
-            col_l, col_vat = st.columns(2)
-            with col_l:
-                st.metric("Total Leave Requests", total_leaves_all)
-            with col_vat:
-                st.metric("Total VAT Processed", f"INR {total_vat_amount_all:,.2f}")
-
-
-            st.markdown("---")
-            st.info("This section displays aggregated data, charts, and summaries from all companies.")
-            st.warning("Note: All data is persisted in a SQLite database file.")
-
-        elif menu_selection == "Analysis Dashboard":
-            st.subheader("Cross-Company Analytical Insights")
-
-            st.markdown("#### Overall Revenue Performance")
-            gauge_max_revenue = max(total_revenue_all * 1.5, 100000.0) if total_revenue_all > 0 else 100000.0
-
-            fig_gauge = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=total_revenue_all,
-                domain={'x': [0, 1], 'y': [0, 1]},
-                title={'text': "Total Revenue (INR)"},
-                gauge={
-                    'axis': {'range': [None, gauge_max_revenue], 'tickwidth': 1, 'tickcolor': "darkblue"},
-                    'bar': {'color': "darkgreen"},
-                    'bgcolor': "white",
-                    'borderwidth': 2,
-                    'bordercolor': "gray",
-                    'steps': [
-                        {'range': [0, gauge_max_revenue * 0.5], 'color': 'lightgray'},
-                        {'range': [gauge_max_revenue * 0.5, gauge_max_revenue], 'color': 'gray'}],
-                    'threshold': {
-                        'line': {'color': "red", 'width': 4},
-                        'thickness': 0.75,
-                        'value': gauge_max_revenue * 0.8}
-                }
-            ))
-            st.plotly_chart(fig_gauge, use_container_width=True)
-
-            st.markdown("#### Vehicle Distribution by Type (All Companies)")
-            all_vehicles_df = all_companies_operational_data.get('vehicles', pd.DataFrame())
-            if not all_vehicles_df.empty:
-                vehicle_type_counts = all_vehicles_df['Vehicle Type'].value_counts().reset_index()
-                vehicle_type_counts.columns = ['Vehicle Type', 'Count']
-                fig_donut = px.pie(
-                    vehicle_type_counts,
-                    values='Count',
-                    names='Vehicle Type',
-                    title='Total Vehicles by Type',
-                    hole=0.4
-                )
-                st.plotly_chart(fig_donut, use_container_width=True)
-            else:
-                st.info("No vehicle data available for analysis yet.")
-
-            st.markdown("#### Revenue Per Company")
-            revenue_data_list = []
-            for comp_id_key, comp_details in USER_DB_CURRENT.items():
-                if comp_details['company_pin'] != 'ADMIN':
-                    comp_name = comp_details['company_name']
-                    comp_invoices_df = all_companies_operational_data.get('invoices', pd.DataFrame())
-                    company_revenue = 0.0
-                    if not comp_invoices_df.empty and 'Company' in comp_invoices_df.columns:
-                        company_revenue = comp_invoices_df[comp_invoices_df['Company'] == comp_name]['Total Amount'].sum() if 'Total Amount' in comp_invoices_df.columns else 0.0
-                    revenue_data_list.append({'Company': comp_name, 'Revenue': company_revenue})
-            
-            revenue_by_company_df = pd.DataFrame(revenue_data_list)
-
-            if not revenue_by_company_df.empty and revenue_by_company_df['Revenue'].sum() > 0:
-                fig_revenue_bar = px.bar(
-                    revenue_by_company_df,
-                    x='Company',
-                    y='Revenue',
-                    title='Total Revenue by Company',
-                    labels={'Revenue': 'Total Revenue (INR)'},
-                    color='Company'
-                )
-                st.plotly_chart(fig_revenue_bar, use_container_width=True)
-            else:
-                st.info("No revenue data available for analysis yet.")
-
-            st.markdown("#### Employees Per Company")
-            employee_data_list = []
-            for comp_id_key, comp_details in USER_DB_CURRENT.items():
-                if comp_details['company_pin'] != 'ADMIN':
-                    comp_name = comp_details['company_name']
-                    comp_employees_df = all_companies_operational_data.get('employees', pd.DataFrame())
-                    num_employees = 0
-                    if not comp_employees_df.empty and 'Company' in comp_employees_df.columns:
-                        num_employees = len(comp_employees_df[comp_employees_df['Company'] == comp_name])
-                    employee_data_list.append({'Company': comp_name, 'Employees': num_employees})
-            
-            employees_by_company_df = pd.DataFrame(employee_data_list)
-
-            if not employees_by_company_df.empty and employees_by_company_df['Employees'].sum() > 0:
-                fig_employee_bar = px.bar(
-                    employees_by_company_df,
-                    x='Company',
-                    y='Employees',
-                    title='Number of Employees by Company',
-                    labels={'Employees': 'Number of Employees'},
-                    color='Company'
-                )
-                st.plotly_chart(fig_employee_bar, use_container_width=True)
-            else:
-                st.info("No employee data available for analysis yet.")
-
-            st.markdown("#### Total Trips Per Company")
-            trips_data_list = []
-            for comp_id_key, comp_details in USER_DB_CURRENT.items():
-                if comp_details['company_pin'] != 'ADMIN':
-                    comp_name = comp_details['company_name']
-                    comp_trips_df = all_companies_operational_data.get('trips', pd.DataFrame())
-                    num_trips = 0
-                    if not comp_trips_df.empty and 'Company' in comp_trips_df.columns:
-                        num_trips = len(comp_trips_df[comp_trips_df['Company'] == comp_name])
-                    trips_data_list.append({'Company': comp_name, 'Total Trips': num_trips})
-            
-            trips_by_company_df = pd.DataFrame(trips_data_list)
-
-            if not trips_by_company_df.empty and trips_by_company_df['Total Trips'].sum() > 0:
-                fig_trips_bar = px.bar(
-                    trips_by_company_df,
-                    x='Company',
-                    y='Total Trips',
-                    title='Total Number of Trips by Company',
-                    labels={'Total Trips': 'Number of Trips'},
-                    color='Company'
-                )
-                st.plotly_chart(fig_trips_bar, use_container_width=True)
-            else:
-                st.info("No trip data available for this chart yet.")
-
-            st.markdown("#### Total Entries Across All Modules (All Companies)")
-            module_counts = {}
-            for module_name_key in MODULE_FIELDS_MAP.keys():
-                df = all_companies_operational_data.get(module_name_key, pd.DataFrame())
-                if not df.empty:
-                    # Filter out admin company entries if 'Company' column exists and is not empty
-                    operational_df = df[df['Company'] != 'Global Management'].copy()
-                    if not operational_df.empty: # Only count if there's actual data after filtering
-                        module_counts[module_name_key.replace('_', ' ').title()] = len(operational_df)
-                else:
-                    module_counts[module_name_key.replace('_', ' ').title()] = 0 # Ensure module is listed even if empty
-
-
-            module_counts_df = pd.DataFrame(list(module_counts.items()), columns=['Module', 'Count'])
-
-            if not module_counts_df.empty and module_counts_df['Count'].sum() > 0:
-                fig_all_modules_bar = px.bar(
-                    module_counts_df,
-                    x='Module',
-                    y='Count',
-                    title='Total Entries by Module (All Companies)',
-                    labels={'Count': 'Number of Entries'},
-                    color='Module'
-                )
-                st.plotly_chart(fig_all_modules_bar, use_container_width=True)
-            else:
-                st.info("No data available across all modules for this chart yet.")
-
-
-            st.markdown("---")
-            st.info("These charts provide a visual summary of your companies' performance.")
-            st.warning("Note: All data is persisted in a SQLite database file.")
-
-
-        elif menu_selection == "Cross-Company Reports":
-            st.subheader("Generate Cross-Company Reports and Consolidated Data")
-            st.info("This section provides reports that combine data from ALL operational companies in the system.")
-            
-            st.markdown("#### Consolidated Operational Data Overview (All Companies)")
-            all_operational_data_concat = pd.DataFrame()
-            for module_name_key in MODULE_FIELDS_MAP.keys():
-                df = all_companies_operational_data.get(module_name_key, pd.DataFrame())
-                if not df.empty and 'Company' in df.columns:
-                    filtered_df_for_concat = df[df['Company'] != 'Global Management'].copy()
-                    if not filtered_df_for_concat.empty:
-                        filtered_df_for_concat['Module'] = module_name_key.replace('_', ' ').title()
-                        all_operational_data_concat = pd.concat([all_operational_data_concat, filtered_df_for_concat], ignore_index=True)
-
-            if not all_operational_data_concat.empty:
-                st.dataframe(add_serial_numbers(all_operational_data_concat.drop(columns=['doc_id', 'company_id'], errors='ignore')), use_container_width=True, hide_index=True)
-                col_ex_overall, col_pdf_overall = st.columns(2)
-                with col_ex_overall:
-                    st.download_button(
-                        label="Download All Companies Consolidated Excel",
-                        data=generate_excel_report(all_operational_data_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All_Companies_Consolidated_Report"),
-                        file_name=f"All_Companies_Consolidated_Report_{datetime.date.today()}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="all_companies_consolidated_excel_download"
-                    )
-                with col_pdf_overall:
-                    st.download_button(
-                        label="Download All Companies Consolidated PDF",
-                        data=generate_pdf_report(all_operational_data_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All Companies Consolidated Report"),
-                        file_name=f"All_Companies_Consolidated_Report_{datetime.date.today()}.pdf",
-                        mime="application/pdf",
-                        key="all_companies_consolidated_pdf_download"
-                    )
-            else:
-                st.info("No operational data available across all companies yet. Please add data using individual company logins.")
-
-            st.markdown("---")
-            st.subheader("Specific Cross-Company Reports")
-            all_trips_df = all_companies_operational_data.get('trips', pd.DataFrame())
-            if not all_trips_df.empty:
-                st.markdown("#### All Trips Overview (All Companies)")
-                st.dataframe(add_serial_numbers(all_trips_df.drop(columns=['doc_id', 'company_id'], errors='ignore')), use_container_width=True, hide_index=True)
-                col_ex, col_pdf = st.columns(2)
-                with col_ex:
-                    st.download_button(
-                        label="Download All Trips Excel",
-                        data=generate_excel_report(all_trips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All_Trips_Report"),
-                        file_name=f"All_Trips_Report_{datetime.date.today()}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="all_trips_excel_download"
-                    )
-                with col_pdf:
-                    st.download_button(
-                        label="Download All Trips PDF",
-                        data=generate_pdf_report(all_trips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All Trips Report"),
-                        file_name=f"All_Trips_Report_{datetime.date.today()}.pdf",
-                        mime="application/pdf",
-                        key="all_trips_pdf_download"
-                    )
-            else:
-                st.info("No trip data available for cross-company reports yet.")
-            
-            st.markdown("---")
-            st.markdown("#### Custom Management Report (PDF with Company Details)")
-            st.write("This PDF report provides an overview of all companies, including their individual vehicle counts, employees, and financial summaries.")
-            if st.button("Download Management Report (PDF)", key="download_management_pdf_final"):
-                management_pdf_data = generate_management_pdf_report(all_companies_operational_data, USER_DB_CURRENT)
-                st.download_button(
-                    label="Download Management Report PDF",
-                    data=management_pdf_data,
-                    file_name=f"Management_Report_{datetime.date.today()}.pdf",
-                    mime="application/pdf",
-                    key="management_pdf_download_final"
-                )
-
-
-        elif menu_selection == "User & Company Management":
-            st.subheader("Manage System Users and Companies")
-            st.info("Click 'View Details' on a company card to see its operational modules, or use 'View Company Modules' in the sidebar to directly select a company.")
-            
-            operational_companies = {cid: cdetails for cid, cdetails in USER_DB_CURRENT.items() if cdetails['company_pin'] != 'ADMIN'}
-            
-            num_columns = 3
-            cols = st.columns(num_columns)
-
-            company_list_for_display = sorted(list(operational_companies.items()), key=lambda item: item[1]['company_name'])
-
-            for i, (comp_id, comp_details) in enumerate(company_list_for_display):
-                with cols[i % num_columns]:
-                    st.markdown(f"**{comp_details['company_name']}**")
-                    st.markdown(f"PIN: `{comp_details['company_pin']}`")
-                    st.markdown(f"Users: {len(comp_details['users'])}")
-                    
-                    if st.button(f"View Details for {comp_details['company_name']}", key=f"view_company_details_{comp_id}"):
-                        st.session_state['admin_selected_company_for_modules_name'] = comp_details['company_name']
-                        st.session_state['set_admin_nav_to_view_modules'] = True
-                        st.rerun()
-                if (i + 1) % num_columns == 0 and (i + 1) < len(company_list_for_display):
-                    st.markdown("---")
-
-
-        elif menu_selection == "View Company Modules":
-            st.subheader("View Individual Company Operational Data")
-            operational_companies = {cid: cdetails for cid, cdetails in USER_DB_CURRENT.items() if cdetails['company_pin'] != 'ADMIN'}
-            
-            company_names = sorted([details['company_name'] for details in operational_companies.values()])
-            
-            default_index = 0
-            if st.session_state['admin_selected_company_for_modules_name'] and st.session_state['admin_selected_company_for_modules_name'] in company_names:
-                default_index = company_names.index(st.session_state['admin_selected_company_for_modules_name']) + 1
-
-            selected_company_name_for_modules = st.selectbox(
-                "Select a Company to View its Modules:", 
-                ['--- Select a Company ---'] + company_names,
-                index=default_index,
-                key="admin_select_company_for_modules"
-            )
-            st.session_state['admin_selected_company_for_modules_name'] = None 
-
-
-            if selected_company_name_for_modules and selected_company_name_for_modules != '--- Select a Company ---':
-                selected_company_id_for_modules = None
-                for comp_id, comp_details in USER_DB_CURRENT.items():
-                    if comp_details['company_name'] == selected_company_name_for_modules:
-                        selected_company_id_for_modules = comp_id
-                        break
-                
-                if not selected_company_id_for_modules:
-                    st.error("Error: Could not retrieve company ID for the selected company name.")
-                    return
-
-                st.markdown(f"### Showing Modules for: {selected_company_name_for_modules}")
-                st.markdown("---")
-
-                if selected_company_id_for_modules:
-                    st.subheader(f"Company Details: {selected_company_name_for_modules}")
-                    col_name, col_pin, col_users = st.columns(3)
-                    with col_name:
-                        st.info(f"**Company Name:**\n\n {selected_company_name_for_modules}")
-                    with col_pin:
-                        st.info(f"**Company PIN:**\n\n {USER_DB_CURRENT[selected_company_id_for_modules]['company_pin']}")
-                    with col_users:
-                        st.info(f"**Number of Users:**\n\n {len(USER_DB_CURRENT[selected_company_id_for_modules]['users'])}")
-                    st.markdown("---")
-
-                display_module("Trip", TRIP_MANAGEMENT_FIELDS, 'trips', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
-
-                display_module("Rental", RENTAL_MANAGEMENT_FIELDS, 'rentals', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
-                
-                display_module("Fleet", FLEET_MANAGEMENT_FIELDS, 'vehicles', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
-
-                display_module("Invoicing & Quoting", INVOICING_QUOTING_FIELDS, 'invoices', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
-
-                display_module("CRM / Customer Management", CRM_MANAGEMENT_FIELDS, 'clients', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
-
-                display_module("Employee", EMPLOYEE_MANAGEMENT_FIELDS, 'employees', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
-
-                with st.expander(f"**Payroll Management**"):
-                    st.header("Payroll Management")
-                    current_company_payslips = get_db_collection(selected_company_id_for_modules, 'payslips')
-
-                    st.subheader(f"Generate Payslip for {selected_company_name_for_modules}")
-
-                    # Initialize or retrieve widget values for payroll
-                    session_state_key_for_payslip_add = f'add_new_payslip_values_{selected_company_id_for_modules}'
-                    if session_state_key_for_payslip_add not in st.session_state:
-                        st.session_state[session_state_key_for_payslip_add] = {
-                            'Employee Name': '',
-                            'Month': str(datetime.date.today().month),
-                            'Year': str(datetime.date.today().year),
-                            'Base Salary': 0.0,
-                            'Trip Bonus': 0.0,
-                            'Rental Commission': 0.0,
-                            'Deductions': 0.0,
-                            'Overtime': 0.0,
-                            'Net Salary': 0.0,
-                            'Payment Status': 'Unpaid'
+        new_username = st.text_input("Username", value="" if user_to_edit == "(New User)" else user_to_edit)
+        new_password = st.text_input("Password (leave blank if not changing)", type="password")
+        new_role = st.selectbox("Role", options=["user", "admin"], index=0 if user_to_edit == "(New User)" else (0 if st.session_state['USER_DB'].get(selected_company_for_user_ops, {}).get('users', {}).get(user_to_edit, {}).get('role') == 'user' else 1))
+
+        submitted = st.form_submit_button("Save User")
+        if submitted:
+            target_company_id = selected_company_for_user_ops
+            if selected_company_for_user_ops == "Add New Company...":
+                if new_company_name and new_company_pin:
+                    if new_company_name not in st.session_state['USER_DB']:
+                        st.session_state['USER_DB'][new_company_name] = {
+                            "company_name": new_company_name,
+                            "company_pin": new_company_pin,
+                            "users": {}
                         }
-                    
-                    current_payslip_values = st.session_state[session_state_key_for_payslip_add]
-
-                    payslip_emp_name = st.text_input("Employee Name (for Payslip)", value=current_payslip_values['Employee Name'], placeholder="Enter employee name", key=f"admin_{selected_company_id_for_modules}_payroll_emp_name")
-                    payslip_month = st.selectbox("Month", options=[str(i) for i in range(1, 13)], index=[str(i) for i in range(1, 13)].index(current_payslip_values['Month']), key=f"admin_{selected_company_id_for_modules}_payroll_month")
-                    payslip_year = st.selectbox("Year", options=[str(i) for i in range(2020, datetime.datetime.now().year + 2)], index=[str(i) for i in range(2020, datetime.datetime.now().year + 2)].index(current_payslip_values['Year']), key=f"admin_{selected_company_id_for_modules}_payroll_year")
-                    base_salary = st.number_input("Base Salary", value=float(current_payslip_values['Base Salary']), key=f"admin_{selected_company_id_for_modules}_payroll_base_salary")
-                    trip_bonus = st.number_input("Trip Bonus", value=float(current_payslip_values['Trip Bonus']), key=f"admin_{selected_company_id_for_modules}_payroll_trip_bonus")
-                    rental_commission = st.number_input("Rental Commission", value=float(current_payslip_values['Rental Commission']), key=f"admin_{selected_company_id_for_modules}_payroll_rental_commission")
-                    deductions = st.number_input("Deductions", value=float(current_payslip_values['Deductions']), key=f"admin_{selected_company_id_for_modules}_payroll_deductions")
-                    overtime = st.number_input("Overtime", value=float(current_payslip_values['Overtime']), key=f"admin_{selected_company_id_for_modules}_payroll_overtime")
-
-                    net_salary = base_salary + trip_bonus + rental_commission + overtime - deductions
-                    st.write(f"Calculated Net Salary: **INR {net_salary:.2f}**")
-
-                    if st.button(f"Generate Payslip for {selected_company_name_for_modules}", key=f"admin_{selected_company_id_for_modules}_generate_payslip_btn"):
-                        existing_payslip_check = current_company_payslips[
-                            (current_company_payslips['Employee Name'] == payslip_emp_name) &
-                            (current_company_payslips['Month'] == payslip_month) &
-                            (current_company_payslips['Year'] == payslip_year)
-                        ]
-                        
-                        payslip_data = {
-                            'Company': selected_company_name_for_modules,
-                            'Payslip ID': f"PS_{payslip_emp_name[:3].upper()}_{payslip_month}{payslip_year}_{datetime.datetime.now().strftime('%H%M%S%f')}",
-                            'Employee Name': payslip_emp_name, 'Month': payslip_month, 'Year': payslip_year,
-                            'Base Salary': base_salary, 'Trip Bonus': trip_bonus,
-                            'Rental Commission': rental_commission, 'Deductions': deductions,
-                            'Overtime': overtime, 'Net Salary': net_salary, 'Payment Status': 'Unpaid'
-                        }
-
-                        if not existing_payslip_check.empty:
-                            st.warning(f"A payslip for {payslip_emp_name} for {payslip_month}/{payslip_year} already exists in {selected_company_name_for_modules}. Do you want to overwrite it?")
-                            col_confirm_yes, col_confirm_no = st.columns(2)
-                            with col_confirm_yes:
-                                if st.button("Confirm Overwrite", key=f"admin_{selected_company_id_for_modules}_confirm_overwrite"):
-                                    doc_id_to_overwrite = existing_payslip_check['doc_id'].iloc[0]
-                                    if update_db_document(selected_company_id_for_modules, 'payslips', doc_id_to_overwrite, payslip_data):
-                                        st.success("Payslip overwritten and regenerated successfully!")
-                                        st.session_state[session_state_key_for_payslip_add] = {} # Clear for rerun
-                                        st.rerun()
-                            with col_confirm_no:
-                                if st.button("Cancel", key=f"admin_{selected_company_id_for_modules}_cancel_overwrite"):
-                                    st.info("Payslip generation cancelled.")
-                        else:
-                            if add_db_document(selected_company_id_for_modules, 'payslips', payslip_data):
-                                st.success("Payslip generated successfully!")
-                                st.session_state[session_state_key_for_payslip_add] = {} # Clear for rerun
-                                st.rerun()
-
-                    st.subheader(f"Payroll History for {selected_company_name_for_modules}")
-                    display_df = add_serial_numbers(current_company_payslips.drop(columns=['doc_id', 'company_id'], errors='ignore'))
-
-                    edited_payslip_df = st.data_editor(
-                        display_df,
-                        key=f"admin_{selected_company_id_for_modules}_payslip_history_editor",
-                        hide_index=True,
-                        num_rows="dynamic",
-                        use_container_width=True
-                    )
-                    
-                    original_payslips_by_doc_id = {row['doc_id']: row for _, row in current_company_payslips.iterrows()}
-
-                    updated_payslip_count = 0
-                    deleted_payslip_count = 0
-                    added_payslip_count = 0
-
-                    edited_payslip_doc_ids_in_data = set(edited_payslip_df['doc_id'].dropna().tolist()) if 'doc_id' in edited_payslip_df.columns else set()
-                    original_payslip_doc_ids = set(original_payslips_by_doc_id.keys())
-                    deleted_payslip_doc_ids = original_payslip_doc_ids - edited_payslip_doc_ids_in_data
-
-                    for doc_id_to_delete in deleted_payslip_doc_ids:
-                        if delete_db_document(selected_company_id_for_modules, 'payslips', doc_id_to_delete):
-                            deleted_payslip_count += 1
-
-                    for index, row_data_from_editor in edited_payslip_df.iterrows():
-                        row_doc_id = row_data_from_editor.get('doc_id')
-                        cleaned_edited_data = {}
-                        for k, v in row_data_from_editor.items():
-                            if k not in ['SL No', 'doc_id', 'company_id']:
-                                if pd.isna(v):
-                                    cleaned_edited_data[k] = None
-                                elif PAYROLL_FIELDS.get(k, {}).get('type') == 'select' and v == '--- Select ---':
-                                    cleaned_edited_data[k] = None
-                                elif PAYROLL_FIELDS.get(k, {}).get('type') == 'checkbox':
-                                    cleaned_edited_data[k] = 1 if v else 0
-                                else:
-                                    cleaned_edited_data[k] = v
-
-                        # Recalculate Net Salary for Payroll module
-                        base_salary = cleaned_edited_data.get('Base Salary', 0.0)
-                        trip_bonus = cleaned_edited_data.get('Trip Bonus', 0.0)
-                        rental_commission = cleaned_edited_data.get('Rental Commission', 0.0)
-                        deductions = cleaned_edited_data.get('Deductions', 0.0)
-                        overtime = cleaned_edited_data.get('Overtime', 0.0)
-                        cleaned_edited_data['Net Salary'] = base_salary + trip_bonus + rental_commission + overtime - deductions
-
-                        if pd.isna(row_doc_id) or row_doc_id is None:
-                            for field_name, field_cfg in PAYROLL_FIELDS.items():
-                                if field_name in ['Payslip ID', 'Net Salary']:
-                                    continue
-                                if field_name not in cleaned_edited_data or cleaned_edited_data[field_name] is None:
-                                    if field_cfg['type'] == 'text':
-                                        cleaned_edited_data[field_name] = ""
-                                    elif field_cfg['type'] == 'number':
-                                        cleaned_edited_data[field_name] = 0.0
-                                    elif field_cfg['type'] == 'select':
-                                        cleaned_edited_data[field_name] = field_cfg['options'][0] if field_cfg['options'] else None
-
-                            if 'Company' not in cleaned_edited_data:
-                                cleaned_edited_data['Company'] = selected_company_name_for_modules
-                            if 'Payslip ID' not in cleaned_edited_data:
-                                emp_name_short = cleaned_edited_data.get('Employee Name', 'UNK')[:3].upper()
-                                month_val = cleaned_edited_data.get('Month', '00')
-                                year_val = cleaned_edited_data.get('Year', '0000')
-                                cleaned_edited_data['Payslip ID'] = f"PS_{emp_name_short}_{month_val}{year_val}_{datetime.datetime.now().strftime('%H%M%S%f')}"
-
-                            if add_db_document(selected_company_id_for_modules, 'payslips', cleaned_edited_data):
-                                added_payslip_count += 1
-                        
-                        elif row_doc_id in original_payslips_by_doc_id:
-                            original_row_data = original_payslips_by_doc_id[row_doc_id]
-                            cleaned_original_data = {k: v for k, v in original_row_data.items() if k not in ['SL No', 'doc_id', 'company_id']}
-                            
-                            if cleaned_edited_data != cleaned_original_data:
-                                if update_db_document(selected_company_id_for_modules, 'payslips', row_doc_id, cleaned_edited_data):
-                                    updated_payslip_count += 1
-            
-                    if updated_payslip_count > 0 or deleted_payslip_count > 0 or added_payslip_count > 0:
-                        if updated_payslip_count > 0:
-                            st.success(f"{updated_payslip_count} Payslip entries updated successfully!")
-                        if deleted_payslip_count > 0:
-                            st.success(f"{deleted_payslip_count} Payslip entries deleted successfully!")
-                        if added_payslip_count > 0:
-                            st.success(f"{added_payslip_count} new Payslip entries added successfully!")
-                        st.rerun()
-
-                    st.subheader(f"Download Payslip Reports for {selected_company_name_for_modules}")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        excel_data = generate_excel_report(current_company_payslips.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"Payroll_Report_{selected_company_name_for_modules}")
-                        st.download_button(
-                            label=f"Download Payroll Excel ({selected_company_name_for_modules})",
-                            data=excel_data,
-                            file_name=f"Payroll_Report_{selected_company_name_for_modules}_{datetime.date.today()}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"admin_{selected_company_id_for_modules}_payroll_excel_download"
-                        )
-                    with col2:
-                        pdf_data = generate_pdf_report(current_company_payslips.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"Payroll Report ({selected_company_name_for_modules})")
-                        st.download_button(
-                            label=f"Download Payroll PDF ({selected_company_name_for_modules})",
-                            data=pdf_data,
-                            file_name=f"Payroll_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
-                            mime="application/pdf",
-                            key=f"admin_{selected_company_id_for_modules}_payroll_pdf_download"
-                        )
-
-                    st.markdown("---")
-
-                display_module("Planning & Time Off", PLANNING_TIMEOFF_FIELDS, 'leaves', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
-
-                display_module("VAT Input/Output", VAT_INPUT_OUTPUT_FIELDS, 'vat_transactions', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
-                
-                with st.expander(f"**VAT Return Report for {selected_company_name_for_modules}**"):
-                    st.subheader(f"VAT Return Report ({selected_company_name_for_modules}) (Placeholder)")
-                    st.info("Automate VAT calculation and generate VAT return reports here.")
-                    st.write("Output VAT from Sales Invoices.")
-                    st.write("Input VAT from Purchases.")
-                    st.write("Auto-generate VAT Return Report for export.")
-                    if st.button(f"Generate VAT Return Report ({selected_company_name_for_modules})", key=f"admin_{selected_company_id_for_modules}_generate_vat_report"):
-                        vat_data_for_report = get_db_collection(selected_company_id_for_modules, 'vat_transactions')
-                        vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"VAT Return Report for {selected_company_name_for_modules}")
-                        st.download_button(
-                            label=f"Download VAT Return Report PDF ({selected_company_name_for_modules})",
-                            data=vat_report_pdf,
-                            file_name=f"VAT_Return_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
-                            mime="application/pdf",
-                            key=f"admin_{selected_company_id_for_modules}_vat_pdf_download"
-                        )
-                        st.success(f"VAT Return Report generated (placeholder) for {selected_company_name_for_modules}.")
-
-
-            else:
-                st.info("Please select a company from the dropdown to view its detailed module data.")
-
-
-    else: # Regular user dashboard
-        st.sidebar.title(f"{st.session_state['company_name']} Dashboard")
-        st.sidebar.write(f"Logged in as: {st.session_state['user_id']}")
-        st.sidebar.write(f"Company ID: `{st.session_state['company_id']}`")
-
-        menu_options = [
-            "Home Dashboard",
-            "Trip Management",
-            "Rental Management",
-            "Fleet Management",
-            "Invoicing & Quoting",
-            "CRM / Customer Management",
-            "Employee Management",
-            "Payroll",
-            "Planning & Time Off",
-            "Reports Dashboard",
-            "VAT Input/Output"
-        ]
-        selected_module = st.sidebar.radio("Modules", menu_options, key="user_nav")
-
-        st.title(f"{st.session_state['company_name']} - {selected_module}")
-
-        if selected_module == "Home Dashboard":
-            st.subheader("Welcome to Your Company's Dashboard!")
-            st.info("This section will provide key performance indicators and summaries specific to your company.")
-            st.write("E.g., Number of Ongoing Trips, Recent Rentals, Fleet Availability, Revenue this month.")
-            st.warning("Note: All data is persisted in a SQLite database file.")
-
-
-        elif selected_module == "Trip Management":
-            display_module("Trip", TRIP_MANAGEMENT_FIELDS, 'trips', crud_enabled=True, company_filter_id=st.session_state['company_id'])
-
-        elif selected_module == "Rental Management":
-            display_module("Rental", RENTAL_MANAGEMENT_FIELDS, 'rentals', crud_enabled=True, company_filter_id=st.session_state['company_id'])
-
-        elif selected_module == "Fleet Management":
-            display_module("Fleet", FLEET_MANAGEMENT_FIELDS, 'vehicles', crud_enabled=True, company_filter_id=st.session_state['company_id'])
-
-        elif selected_module == "Invoicing & Quoting":
-            display_module("Invoicing & Quoting", INVOICING_QUOTING_FIELDS, 'invoices', crud_enabled=True, company_filter_id=st.session_state['company_id'])
-
-        elif selected_module == "CRM / Customer Management":
-            display_module("CRM / Customer Management", CRM_MANAGEMENT_FIELDS, 'clients', crud_enabled=True, company_filter_id=st.session_state['company_id'])
-
-        elif selected_module == "Employee Management":
-            display_module("Employee", EMPLOYEE_MANAGEMENT_FIELDS, 'employees', crud_enabled=True, company_filter_id=st.session_state['company_id'])
-
-        elif selected_module == "Payroll":
-            st.header("Payroll Management")
-            current_company_payslips = get_db_collection(st.session_state['company_id'], 'payslips')
-
-            st.subheader("Generate Payslip")
-            # Initialize or retrieve widget values for payroll
-            session_state_key_for_payslip_add_user = f'add_new_payslip_values_{st.session_state["company_id"]}'
-            if session_state_key_for_payslip_add_user not in st.session_state:
-                st.session_state[session_state_key_for_payslip_add_user] = {
-                    'Employee Name': '',
-                    'Month': str(datetime.date.today().month),
-                    'Year': str(datetime.date.today().year),
-                    'Base Salary': 0.0,
-                    'Trip Bonus': 0.0,
-                    'Rental Commission': 0.0,
-                    'Deductions': 0.0,
-                    'Overtime': 0.0,
-                    'Net Salary': 0.0,
-                    'Payment Status': 'Unpaid'
-                }
-            
-            current_payslip_values_user = st.session_state[session_state_key_for_payslip_add_user]
-
-            payslip_emp_name = st.text_input("Employee Name (for Payslip)", value=current_payslip_values_user['Employee Name'], placeholder="Enter employee name", key=f"{st.session_state['company_id']}_payroll_emp_name")
-            payslip_month = st.selectbox("Month", options=[str(i) for i in range(1, 13)], index=[str(i) for i in range(1, 13)].index(current_payslip_values_user['Month']), key=f"{st.session_state['company_id']}_payroll_month")
-            payslip_year = st.selectbox("Year", options=[str(i) for i in range(2020, datetime.datetime.now().year + 2)], index=[str(i) for i in range(2020, datetime.datetime.now().year + 2)].index(current_payslip_values_user['Year']), key=f"{st.session_state['company_id']}_payroll_year")
-            base_salary = st.number_input("Base Salary", value=float(current_payslip_values_user['Base Salary']), key=f"{st.session_state['company_id']}_payroll_base_salary")
-            trip_bonus = st.number_input("Trip Bonus", value=float(current_payslip_values_user['Trip Bonus']), key=f"{st.session_state['company_id']}_payroll_trip_bonus")
-            rental_commission = st.number_input("Rental Commission", value=float(current_payslip_values_user['Rental Commission']), key=f"{st.session_state['company_id']}_payroll_rental_commission")
-            deductions = st.number_input("Deductions", value=float(current_payslip_values_user['Deductions']), key=f"{st.session_state['company_id']}_payroll_deductions")
-            overtime = st.number_input("Overtime", value=float(current_payslip_values_user['Overtime']), key=f"{st.session_state['company_id']}_payroll_overtime")
-
-            net_salary = base_salary + trip_bonus + rental_commission + overtime - deductions
-            st.write(f"Calculated Net Salary: **INR {net_salary:.2f}**")
-
-            if st.button("Generate Payslip", key=f"{st.session_state['company_id']}_generate_payslip_btn"):
-                existing_payslip_check = current_company_payslips[
-                    (current_company_payslips['Employee Name'] == payslip_emp_name) &
-                    (current_company_payslips['Month'] == payslip_month) &
-                    (current_company_payslips['Year'] == payslip_year)
-                ]
-                
-                payslip_data = {
-                    'Company': st.session_state['company_name'],
-                    'Payslip ID': f"PS_{payslip_emp_name[:3].upper()}_{payslip_month}{payslip_year}_{datetime.datetime.now().strftime('%H%M%S%f')}",
-                    'Employee Name': payslip_emp_name, 'Month': payslip_month, 'Year': payslip_year,
-                    'Base Salary': base_salary, 'Trip Bonus': trip_bonus,
-                    'Rental Commission': rental_commission, 'Deductions': deductions,
-                    'Overtime': overtime, 'Net Salary': net_salary, 'Payment Status': 'Unpaid'
-                }
-
-                if not existing_payslip_check.empty:
-                    st.warning("A payslip for this employee and month/year already exists. Do you want to overwrite it?")
-                    col_confirm_yes, col_confirm_no = st.columns(2)
-                    with col_confirm_yes:
-                        if st.button("Confirm Overwrite", key=f"{st.session_state['company_id']}_confirm_overwrite"):
-                            doc_id_to_overwrite = existing_payslip_check['doc_id'].iloc[0]
-                            if update_db_document(st.session_state['company_id'], 'payslips', doc_id_to_overwrite, payslip_data):
-                                st.success("Payslip overwritten and regenerated successfully!")
-                                st.session_state[session_state_key_for_payslip_add_user] = {} # Clear for rerun
-                                st.rerun()
-                    with col_confirm_no:
-                        if st.button("Cancel", key=f"{st.session_state['company_id']}_cancel_overwrite"):
-                            st.info("Payslip generation cancelled.")
+                        target_company_id = new_company_name
+                        st.success(f"New company '{new_company_name}' added.")
+                    else:
+                        st.warning(f"Company '{new_company_name}' already exists. Adding user to existing company.")
+                        target_company_id = new_company_name
                 else:
-                    if add_db_document(st.session_state['company_id'], 'payslips', payslip_data):
-                        st.success("Payslip generated successfully!")
-                        st.session_state[session_state_key_for_payslip_add_user] = {} # Clear for rerun
-                        st.rerun()
-
-
-            st.subheader("Payroll History")
-            display_df = add_serial_numbers(current_company_payslips.drop(columns=['doc_id', 'company_id'], errors='ignore'))
-            edited_payslip_df = st.data_editor(
-                display_df,
-                key=f"{st.session_state['company_id']}_payslip_history_editor",
-                hide_index=True,
-                num_rows="dynamic",
-                use_container_width=True
-            )
+                    st.error("Please provide both New Company Name and New Company PIN.")
+                    submitted = False # Prevent user save if company creation failed
             
-            original_payslips_by_doc_id = {row['doc_id']: row for _, row in current_company_payslips.iterrows()}
-
-            updated_payslip_count = 0
-            deleted_payslip_count = 0
-            added_payslip_count = 0
-
-            edited_payslip_doc_ids_in_data = set(edited_payslip_df['doc_id'].dropna().tolist()) if 'doc_id' in edited_payslip_df.columns else set()
-            original_payslip_doc_ids = set(original_payslips_by_doc_id.keys())
-            deleted_payslip_doc_ids = original_payslip_doc_ids - edited_payslip_doc_ids_in_data
-
-            for doc_id_to_delete in deleted_payslip_doc_ids:
-                if delete_db_document(st.session_state['company_id'], 'payslips', doc_id_to_delete):
-                    deleted_payslip_count += 1
-
-            for index, row_data_from_editor in edited_payslip_df.iterrows():
-                row_doc_id = row_data_from_editor.get('doc_id')
-                cleaned_edited_data = {}
-                for k, v in row_data_from_editor.items():
-                    if k not in ['SL No', 'doc_id', 'company_id']:
-                        if pd.isna(v):
-                            cleaned_edited_data[k] = None
-                        elif PAYROLL_FIELDS.get(k, {}).get('type') == 'select' and v == '--- Select ---':
-                            cleaned_edited_data[k] = None
-                        elif PAYROLL_FIELDS.get(k, {}).get('type') == 'checkbox':
-                            cleaned_edited_data[k] = 1 if v else 0
+            if submitted and target_company_id:
+                if new_username:
+                    if new_password:
+                        hashed_password = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+                    else:
+                        # If password not changed, keep existing hash for existing user
+                        if user_to_edit != "(New User)" and new_username == user_to_edit:
+                            hashed_password = st.session_state['USER_DB'][target_company_id]['users'][user_to_edit]['password_hash']
                         else:
-                            cleaned_edited_data[k] = v
-
-                # Recalculate Net Salary for Payroll module
-                base_salary = cleaned_edited_data.get('Base Salary', 0.0)
-                trip_bonus = cleaned_edited_data.get('Trip Bonus', 0.0)
-                rental_commission = cleaned_edited_data.get('Rental Commission', 0.0)
-                deductions = cleaned_edited_data.get('Deductions', 0.0)
-                overtime = cleaned_edited_data.get('Overtime', 0.0)
-                cleaned_edited_data['Net Salary'] = base_salary + trip_bonus + rental_commission + overtime - deductions
-
-                if pd.isna(row_doc_id) or row_doc_id is None:
-                    for field_name, field_cfg in PAYROLL_FIELDS.items():
-                        if field_name in ['Payslip ID', 'Net Salary']:
-                            continue
-                        if field_name not in cleaned_edited_data or cleaned_edited_data[field_name] is None:
-                            if field_cfg['type'] == 'text':
-                                cleaned_edited_data[field_name] = ""
-                            elif field_cfg['type'] == 'number':
-                                cleaned_edited_data[field_name] = 0.0
-                            elif field_cfg['type'] == 'select':
-                                cleaned_edited_data[field_name] = field_cfg['options'][0] if field_cfg['options'] else None
-
-                    if 'Company' not in cleaned_edited_data:
-                        cleaned_edited_data['Company'] = st.session_state['company_name']
-                    if 'Payslip ID' not in cleaned_edited_data:
-                        emp_name_short = cleaned_edited_data.get('Employee Name', 'UNK')[:3].upper()
-                        month_val = cleaned_edited_data.get('Month', '00')
-                        year_val = cleaned_edited_data.get('Year', '0000')
-                        cleaned_edited_data['Payslip ID'] = f"PS_{emp_name_short}_{month_val}{year_val}_{datetime.datetime.now().strftime('%H%M%S%f')}"
-
-                    if add_db_document(st.session_state['company_id'], 'payslips', cleaned_edited_data):
-                        added_payslip_count += 1
-                
-                elif row_doc_id in original_payslips_by_doc_id:
-                    original_row_data = original_payslips_by_doc_id[row_doc_id]
-                    cleaned_original_data = {k: v for k, v in original_row_data.items() if k not in ['SL No', 'doc_id', 'company_id']}
+                            st.error("New users require a password.")
+                            return
                     
-                    if cleaned_edited_data != cleaned_original_data:
-                        if update_db_document(st.session_state['company_id'], 'payslips', row_doc_id, cleaned_edited_data):
-                            updated_payslip_count += 1
+                    if target_company_id not in st.session_state['USER_DB']:
+                        st.session_state['USER_DB'][target_company_id] = {"company_name": target_company_id, "company_pin": target_company_id, "users": {}}
+                        
+                    st.session_state['USER_DB'][target_company_id]['users'][new_username] = {
+                        "password_hash": hashed_password,
+                        "role": new_role
+                    }
+                    st.success(f"User '{new_username}' for '{target_company_id}' saved successfully.")
+                    st.rerun()
+                else:
+                    st.error("Please provide a username.")
+
+    st.subheader("Delete User")
+    with st.form("delete_user_form"):
+        company_to_delete_from = st.selectbox("Select Company (to delete user from)", options=list(st.session_state['USER_DB'].keys()))
+        user_to_delete = st.selectbox("Select User to Delete", options=list(st.session_state['USER_DB'].get(company_to_delete_from, {}).get('users', {}).keys()))
+        delete_submitted = st.form_submit_button("Delete User")
+        if delete_submitted and user_to_delete:
+            if st.session_state['USER_DB'][company_to_delete_from]['users'].pop(user_to_delete, None):
+                st.success(f"User '{user_to_delete}' deleted from '{company_to_delete_from}'.")
+                st.rerun()
+            else:
+                st.error("User not found.")
+
+    st.subheader("Delete Company")
+    with st.form("delete_company_form"):
+        company_to_delete = st.selectbox("Select Company to Delete", options=list(st.session_state['USER_DB'].keys()))
+        delete_company_submitted = st.form_submit_button("Delete Company and All Its Users")
+        if delete_company_submitted and company_to_delete:
+            if company_to_delete != "COMPANY MANAGEMENT": # Prevent deleting the admin company
+                if st.session_state['USER_DB'].pop(company_to_delete, None):
+                    st.success(f"Company '{company_to_delete}' and all its users deleted.")
+                    # Also delete data from Firestore for this company
+                    if db:
+                        try:
+                            # This is a dangerous operation, be careful. Consider soft deletes.
+                            # For simplicity, we'll iterate and delete subcollections and then the document.
+                            # Firestore doesn't directly support recursive deletes on collections, only on documents.
+                            # You need to delete all documents in subcollections first.
+                            company_doc_ref = db.collection(FIRESTORE_ROOT_COLLECTION).document(company_to_delete)
+                            for module_config in MODULE_CONFIGS.values():
+                                collection_name = module_config['collection']
+                                docs_to_delete = company_doc_ref.collection(collection_name).stream()
+                                for doc in docs_to_delete:
+                                    doc.reference.delete()
+                            company_doc_ref.delete()
+                            st.success(f"All data for '{company_to_delete}' deleted from Firestore.")
+                        except Exception as e:
+                            st.error(f"Error deleting Firestore data for company '{company_to_delete}': {e}")
+                    st.rerun()
+                else:
+                    st.error("Company not found.")
+            else:
+                st.error("Cannot delete the 'COMPANY MANAGEMENT' company.")
+
+
+    st.subheader("Current User Database Structure")
+    st.json(st.session_state['USER_DB'])
+
+
+def admin_data_management():
+    st.header("Admin Data Management")
+    st.write("View and manage data across all companies.")
+
+    company_keys = [comp_id for comp_id in st.session_state['USER_DB'].keys() if st.session_state['USER_DB'][comp_id]['company_pin'] != 'ADMIN']
+    selected_company_for_data = st.selectbox("Select Company to View Data", options=company_keys)
+    st.session_state['admin_selected_company_for_modules_name'] = selected_company_for_data
+
+    if selected_company_for_data:
+        st.subheader(f"Data for {selected_company_for_data}")
+        # Fetch and display data for the selected company for each module
+        module_options = list(MODULE_CONFIGS.keys())
+        selected_module_for_admin = st.selectbox("Select Module", options=module_options)
+
+        if selected_module_for_admin:
+            st.markdown(f"---")
+            st.subheader(f"{selected_module_for_admin} Data")
+            company_id_for_data = selected_company_for_data
             
-            if updated_payslip_count > 0 or deleted_payslip_count > 0 or added_payslip_count > 0:
-                if updated_payslip_count > 0:
-                    st.success(f"{updated_payslip_count} Payslip entries updated successfully!")
-                if deleted_payslip_count > 0:
-                    st.success(f"{deleted_payslip_count} Payslip entries deleted successfully!")
-                if added_payslip_count > 0:
-                    st.success(f"{added_payslip_count} new Payslip entries added successfully!")
+            collection_name = MODULE_CONFIGS[selected_module_for_admin]["collection"]
+            
+            # Use a unique key for the dataframe in session state
+            df_key = f'df_{company_id_for_data}_{collection_name}'
+
+            if df_key not in st.session_state:
+                st.session_state[df_key] = load_data(company_id_for_data, selected_module_for_admin)
+
+            current_df = st.session_state[df_key].copy()
+
+            if not current_df.empty:
+                st.dataframe(current_df, use_container_width=True)
+            else:
+                st.info(f"No data available for {selected_module_for_admin} in {selected_company_for_data}.")
+
+            # Option to refresh data
+            if st.button(f"Refresh {selected_module_for_admin} Data"):
+                st.session_state[df_key] = load_data(company_id_for_data, selected_module_for_admin)
                 st.rerun()
 
-            st.subheader("Download Payslip Reports")
-            col1, col2 = st.columns(2)
-            with col1:
-                excel_data = generate_excel_report(current_company_payslips.drop(columns=['doc_id', 'company_id'], errors='ignore'), "Payroll_Report")
-                st.download_button(
-                    label="Download Payroll Excel",
-                    data=excel_data,
-                    file_name=f"Payroll_Report_{st.session_state['company_name']}_{datetime.date.today()}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"{st.session_state['company_id']}_payroll_excel_download"
-                )
-            with col2:
-                pdf_data = generate_pdf_report(current_company_payslips.drop(columns=['doc_id', 'company_id'], errors='ignore'), "Payroll Report")
-                st.download_button(
-                    label="Download Payroll PDF",
-                    data=pdf_data,
-                    file_name=f"Payroll_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
-                    mime="application/pdf",
-                    key=f"{st.session_state['company_id']}_payroll_pdf_download"
-                )
 
+def admin_reports_dashboard():
+    st.header("Admin Global Reports & Dashboard")
+    st.write("Generate comprehensive reports and view dashboards across all companies.")
 
-        elif selected_module == "Planning & Time Off":
-            display_module("Planning & Time Off", PLANNING_TIMEOFF_FIELDS, 'leaves', crud_enabled=True, company_filter_id=st.session_state['company_id'])
-            st.subheader("Calendar View (Placeholder)")
-            st.info("Implement a calendar view here to show driver schedules and leave requests. Libraries like `streamlit_calendar` can be used.")
-            st.warning("Logic for overlap warnings would go here, checking employee availability against schedules and leave.")
+    if st.button("Generate Overall Management PDF Report"):
+        # Fetch data for all companies and all relevant modules
+        all_companies_data = {}
+        for module_name, config in MODULE_CONFIGS.items():
+            collection_name = config['collection']
+            combined_df = pd.DataFrame()
+            for company_id_key, company_details in st.session_state['USER_DB'].items():
+                if company_details['company_pin'] != 'ADMIN':
+                    company_df = firestore_get_collection(company_id_key, collection_name)
+                    if not company_df.empty:
+                        company_df['Company'] = company_details['company_name'] # Add company name to each row
+                        combined_df = pd.concat([combined_df, company_df], ignore_index=True)
+            all_companies_data[collection_name] = combined_df
 
-        elif selected_module == "Reports Dashboard":
-            st.subheader(f"Comprehensive Reports for {st.session_state['company_name']}")
-            st.info("This dashboard provides insights into your company's operations across various modules.")
+        pdf_output = generate_management_pdf_report(all_companies_data, st.session_state['USER_DB'])
+        st.download_button(
+            label="Download Overall Management Report (PDF)",
+            data=pdf_output,
+            file_name=f"Global_Management_Report_{datetime.date.today().strftime('%Y%m%d')}.pdf",
+            mime="application/pdf"
+        )
+    st.markdown("---")
 
-            st.markdown("#### Consolidated Data Overview")
-            all_company_data_for_user_concat = pd.DataFrame()
-            for module_name_key in MODULE_FIELDS_MAP.keys():
-                df = get_db_collection(st.session_state['company_id'], module_name_key)
-                if not df.empty and 'Company' in df.columns:
-                    company_filtered_df = df[df['Company'] == st.session_state['company_name']].copy()
-                    if not company_filtered_df.empty:
-                        company_filtered_df['Module'] = module_name_key.replace('_', ' ').title()
-                        all_company_data_for_user_concat = pd.concat([all_company_data_for_user_concat, company_filtered_df], ignore_index=True)
+    st.subheader("Individual Company Data Overview (Interactive)")
 
-            if not all_company_data_for_user_concat.empty:
-                st.dataframe(add_serial_numbers(all_company_data_for_user_concat.drop(columns=['doc_id', 'company_id'], errors='ignore')), use_container_width=True, hide_index=True)
-                col_ex_all, col_pdf_all = st.columns(2)
-                with col_ex_all:
-                    st.download_button(
-                        label=f"Download Consolidated {st.session_state['company_name']} Excel",
-                        data=generate_excel_report(all_company_data_for_user_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{st.session_state['company_id']}_Consolidated_Report"),
-                        file_name=f"{st.session_state['company_name']}_Consolidated_Report_{datetime.date.today()}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key=f"{st.session_state['company_id']}_consolidated_excel"
-                    )
-                with col_pdf_all:
-                    st.download_button(
-                        label=f"Download Consolidated {st.session_state['company_name']} PDF",
-                        data=generate_pdf_report(all_company_data_for_user_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{st.session_state['company_name']} Consolidated Report"),
-                        file_name=f"{st.session_state['company_name']}_Consolidated_Report_{datetime.date.today()}.pdf",
-                        mime="application/pdf",
-                        key=f"{st.session_state['company_id']}_consolidated_pdf"
-                    )
-            else:
-                st.info(f"No data available to generate a consolidated report for {st.session_state['company_name']} yet. Please add data in other modules.")
+    company_keys = [comp_id for comp_id in st.session_state['USER_DB'].keys() if st.session_state['USER_DB'][comp_id]['company_pin'] != 'ADMIN']
+    selected_company_dashboard = st.selectbox("Select Company for Dashboard View", options=company_keys, key="dashboard_company_select")
 
-            st.markdown("---")
-            st.markdown("#### Module Entry Counts (Your Company)")
-            user_module_counts = {}
-            for module_name_key in MODULE_FIELDS_MAP.keys():
-                df = get_db_collection(st.session_state['company_id'], module_name_key)
-                user_module_counts[module_name_key.replace('_', ' ').title()] = len(df)
+    if selected_company_dashboard:
+        st.write(f"### {selected_company_dashboard} Dashboard")
+        
+        # Load relevant data for the selected company
+        company_trips_df = firestore_get_collection(selected_company_dashboard, "trips")
+        company_invoices_df = firestore_get_collection(selected_company_dashboard, "invoices")
+        company_vehicles_df = firestore_get_collection(selected_company_dashboard, "vehicles")
+        company_employees_df = firestore_get_collection(selected_company_dashboard, "employees")
+        
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            total_trips = len(company_trips_df) if not company_trips_df.empty else 0
+            st.metric(label="Total Trips", value=total_trips)
             
-            user_module_counts_df = pd.DataFrame(list(user_module_counts.items()), columns=['Module', 'Count'])
+            # Trips by Status Pie Chart
+            if not company_trips_df.empty and 'Status' in company_trips_df.columns:
+                trip_status_counts = company_trips_df['Status'].value_counts().reset_index()
+                trip_status_counts.columns = ['Status', 'Count']
+                fig_trips_status = px.pie(trip_status_counts, values='Count', names='Status', 
+                                           title='Trips by Status', 
+                                           color_discrete_sequence=px.colors.qualitative.Pastel)
+                st.plotly_chart(fig_trips_status, use_container_width=True)
 
-            if not user_module_counts_df.empty and user_module_counts_df['Count'].sum() > 0:
-                fig_user_modules_bar = px.bar(
-                    user_module_counts_df,
-                    x='Module',
-                    y='Count',
-                    title='Number of Entries by Module (Your Company)',
-                    labels={'Count': 'Number of Entries'},
-                    color='Module'
-                )
-                st.plotly_chart(fig_user_modules_bar, use_container_width=True)
-            else:
-                st.info("No module data available for your company yet for this chart.")
+        with col2:
+            total_revenue = company_invoices_df['Total Amount'].sum() if not company_invoices_df.empty and 'Total Amount' in company_invoices_df.columns else 0
+            st.metric(label="Total Revenue (INR)", value=f"{total_revenue:,.2f}")
 
+            # Revenue by Payment Status Pie Chart
+            if not company_invoices_df.empty and 'Payment Status' in company_invoices_df.columns and 'Total Amount' in company_invoices_df.columns:
+                revenue_by_status = company_invoices_df.groupby('Payment Status')['Total Amount'].sum().reset_index()
+                fig_revenue_status = px.pie(revenue_by_status, values='Total Amount', names='Payment Status',
+                                            title='Revenue by Payment Status',
+                                            color_discrete_sequence=px.colors.qualitative.Set2)
+                st.plotly_chart(fig_revenue_status, use_container_width=True)
+
+        with col3:
+            total_vehicles = len(company_vehicles_df) if not company_vehicles_df.empty else 0
+            st.metric(label="Total Vehicles", value=total_vehicles)
+
+            # Vehicles by Type Bar Chart
+            if not company_vehicles_df.empty and 'Vehicle Type' in company_vehicles_df.columns:
+                vehicle_type_counts = company_vehicles_df['Vehicle Type'].value_counts().reset_index()
+                vehicle_type_counts.columns = ['Vehicle Type', 'Count']
+                fig_vehicle_type = px.bar(vehicle_type_counts, x='Vehicle Type', y='Count',
+                                        title='Vehicles by Type',
+                                        color='Vehicle Type',
+                                        color_discrete_sequence=px.colors.qualitative.D3)
+                st.plotly_chart(fig_vehicle_type, use_container_width=True)
+        
+        st.markdown("---")
+        st.subheader("Employee Overview")
+        total_employees = len(company_employees_df) if not company_employees_df.empty else 0
+        st.metric(label="Total Employees", value=total_employees)
+
+        if not company_employees_df.empty and 'Position' in company_employees_df.columns:
+            employee_positions = company_employees_df['Position'].value_counts().reset_index()
+            employee_positions.columns = ['Position', 'Count']
+            fig_employee_pos = px.bar(employee_positions, x='Position', y='Count',
+                                    title='Employees by Position',
+                                    color='Position',
+                                    color_discrete_sequence=px.colors.qualitative.Pastel)
+            st.plotly_chart(fig_employee_pos, use_container_width=True)
+
+
+# --- Main App Logic ---
+def main():
+    st.set_page_config(layout="wide", page_title="Logistic Management System")
+
+    if not st.session_state['logged_in']:
+        login()
+    else:
+        st.sidebar.title(f"Welcome, {st.session_state['user_id']}!")
+        st.sidebar.markdown(f"**Company:** {st.session_state['company_name']}")
+        st.sidebar.markdown(f"**Role:** {st.session_state['role'].capitalize()}")
+        if st.sidebar.button("Logout"):
+            logout()
+
+        st.sidebar.markdown("---")
+        
+        if st.session_state['role'] == 'admin':
+            st.sidebar.subheader("Admin Functions")
+            admin_options = ["User Management", "Data Management", "Global Reports & Dashboard"]
+            selected_admin_option = st.sidebar.radio("Admin Menu", admin_options)
+
+            if selected_admin_option == "User Management":
+                admin_user_management()
+            elif selected_admin_option == "Data Management":
+                admin_data_management()
+            elif selected_admin_option == "Global Reports & Dashboard":
+                admin_reports_dashboard()
+        
+        else: # Regular user
+            st.sidebar.subheader("Modules")
+            module_options = list(MODULE_CONFIGS.keys())
+            selected_module = st.sidebar.radio("Select a Module", module_options)
+
+            st.title(selected_module)
+            st.write(f"Managing {selected_module} for **{st.session_state['company_name']}**")
             st.markdown("---")
-            st.markdown("#### Trips by Client / Driver / Vehicle (Placeholder)")
-            st.write("Generate charts and tables here based on Trip Management data specific to your company.")
-            st.markdown("#### Income from Rentals vs Deliveries (Placeholder)")
-            st.write("Visualize revenue breakdown for your company.")
-            st.markdown("#### Overdue Payments (Placeholder)")
-            st.write("List and track overdue invoices for your company.")
-            st.markdown("#### Top Customers (Placeholder)")
-            st.write("Identify high-value clients for your company.")
-            st.markdown("#### Vehicle Utilization Rate (Placeholder)")
-            st.write("Analyze fleet usage efficiency for your company.")
-            st.markdown("#### Payroll Summary (Placeholder)")
-            st.write("Summarize monthly payrolls for your company.")
 
+            # Get the company_id for data operations
+            company_id_for_data_ops = st.session_state['company_id']
 
-        elif selected_module == "VAT Input/Output":
-            display_module("VAT Input/Output", VAT_INPUT_OUTPUT_FIELDS, 'vat_transactions', crud_enabled=True, company_filter_id=st.session_state['company_id'])
-            st.subheader("VAT Return Report (Placeholder)")
-            st.info("Automate VAT calculation and generate VAT return reports here.")
-            st.write("Output VAT from Sales Invoices.")
-            st.write("Input VAT from Purchases.")
-            st.write("Auto-generate VAT Return Report for export.")
-            if st.button("Generate VAT Return Report", key=f"{st.session_state['company_id']}_generate_vat_report"):
-                vat_data_for_report = get_db_collection(st.session_state['company_id'], 'vat_transactions')
-                vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"VAT Return Report for {st.session_state['company_name']}")
-                st.download_button(
-                    label=f"Download VAT Return Report PDF ({st.session_state['company_name']})",
-                    data=vat_report_pdf,
-                    file_name=f"VAT_Return_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
-                    mime="application/pdf",
-                    key=f"{st.session_state['company_id']}_vat_pdf_download"
-                )
-                st.success("VAT Return Report generated (placeholder).")
+            # Determine collection name and fields for the selected module
+            collection_name = MODULE_CONFIGS[selected_module]["collection"]
+            fields_config = MODULE_CONFIGS[selected_module]["fields"]
+            
+            # Initialize or load DataFrame for the selected module and company
+            df_key = f'df_{company_id_for_data_ops}_{collection_name}'
+            if df_key not in st.session_state:
+                st.session_state[df_key] = load_data(company_id_for_data_ops, selected_module)
+            
+            current_df = st.session_state[df_key].copy() # Work on a copy
 
+            # --- Data Display ---
+            st.subheader("Current Records")
+            if not current_df.empty:
+                # Drop 'doc_id' for display purposes, keep it for internal operations
+                display_df = current_df.drop(columns=['doc_id'], errors='ignore')
+                st.dataframe(display_df, use_container_width=True)
+            else:
+                st.info(f"No records found for {selected_module}. Add a new record below.")
+            
+            st.markdown("---")
 
-    st.sidebar.markdown("---")
-    if st.sidebar.button("Logout", use_container_width=True):
-        st.session_state['logged_in'] = False
-        st.session_state['company_id'] = None
-        st.session_state['user_id'] = None
-        st.session_state['company_name'] = None
-        st.session_state['role'] = None
-        st.session_state['admin_selected_company_for_modules_name'] = None
-        st.rerun()
+            # --- Add/Edit/Delete Functionality ---
+            action = st.radio("Choose Action", ["Add New Record", "Edit Existing Record", "Delete Record", "Generate Report"])
 
-# --- Main App Execution Flow ---
-if st.session_state['logged_in']:
-    main_app()
-else:
-    login_page()
+            if action == "Add New Record":
+                st.subheader("Add New Record")
+                new_record_data = {}
+                id_col_name = None
+
+                # Generate dynamic input fields
+                for field_name, config in fields_config.items():
+                    if config["editable"]: # Only show editable fields for input
+                        if config["type"] == "text":
+                            new_record_data[field_name] = st.text_input(f"{field_name}:")
+                        elif config["type"] == "number":
+                            new_record_data[field_name] = st.number_input(f"{field_name}:", value=0.0 if "INR" in field_name else 0, format="%.2f" if "INR" in field_name else "%d")
+                        elif config["type"] == "date":
+                            new_record_data[field_name] = st.date_input(f"{field_name}:", value=datetime.date.today())
+                        elif config["type"] == "datetime":
+                            date_val = st.date_input(f"{field_name} (Date):", value=datetime.date.today(), key=f"new_{field_name}_date")
+                            time_val = st.time_input(f"{field_name} (Time):", value=datetime.time(0, 0), key=f"new_{field_name}_time")
+                            new_record_data[field_name] = f"{date_val} {time_val}" if date_val and time_val else None
+                        elif config["type"] == "select":
+                            new_record_data[field_name] = st.selectbox(f"{field_name}:", options=config["options"])
+                        elif config["type"] == "textarea":
+                            new_record_data[field_name] = st.text_area(f"{field_name}:")
+                        elif config["type"] == "json_table": # For Invoicing items
+                            st.write(f"**{field_name}:** (Add/Edit Items below)")
+                            num_items = st.number_input("Number of Items", min_value=1, value=1, key="num_items_new")
+                            items_list = []
+                            for i in range(int(num_items)):
+                                st.markdown(f"***Item {i+1}***")
+                                item_description = st.text_input(f"Description (Item {i+1})", key=f"new_item_desc_{i}")
+                                item_quantity = st.number_input(f"Quantity (Item {i+1})", min_value=0.0, value=1.0, key=f"new_item_qty_{i}")
+                                item_unit_price = st.number_input(f"Unit Price (Item {i+1})", min_value=0.0, value=0.0, format="%.2f", key=f"new_item_price_{i}")
+                                item_amount = item_quantity * item_unit_price
+                                st.write(f"Calculated Amount: {item_amount:,.2f} INR")
+                                items_list.append({
+                                    "Description": item_description,
+                                    "Quantity": item_quantity,
+                                    "Unit Price": item_unit_price,
+                                    "Amount": item_amount
+                                })
+                            new_record_data[field_name] = json.dumps(items_list) # Store as JSON string
+
+                    else: # Handle non-editable fields (e.g., auto-generated IDs, Company)
+                        if field_name == "Company":
+                            new_record_data[field_name] = st.session_state['company_name']
+                        elif "ID" in field_name: # This assumes primary ID contains "ID"
+                            id_col_name = field_name
+                            id_prefix_map = {
+                                "Trip ID": "TRP-",
+                                "Rental ID": "RNT-",
+                                "Vehicle ID": "VHC-",
+                                "Inv Number": "INV-",
+                                "Client ID": "CLI-",
+                                "Employee ID": "EMP-",
+                                "Payslip ID": "PSL-",
+                                "Leave ID": "LEV-",
+                                "Transaction ID": "TRN-"
+                            }
+                            # Get prefix based on module name if not directly in field_name
+                            prefix = id_prefix_map.get(field_name, "REC-")
+                            new_record_data[field_name] = get_next_id(current_df, prefix)
+                
+                if st.button("Add Record"):
+                    # Add new record to DataFrame, then save to Firestore
+                    # Create a new row as a dictionary
+                    # Ensure all configured fields are present, even if None
+                    record_to_add = {field: new_record_data.get(field, None) for field, _ in fields_config.items()}
+                    record_to_add['Company'] = st.session_state['company_name'] # Ensure company is set
+
+                    # Apply calculations before saving
+                    temp_df = pd.DataFrame([record_to_add])
+                    temp_df = apply_calculations(temp_df, selected_module)
+                    record_to_add = temp_df.iloc[0].to_dict() # Get the calculated values
+
+                    new_doc_id = firestore_add_document(company_id_for_data_ops, collection_name, record_to_add)
+                    if new_doc_id:
+                        st.success("Record added successfully!")
+                        # Reload data after adding
+                        st.session_state[df_key] = load_data(company_id_for_data_ops, selected_module)
+                        st.rerun() # Rerun to clear input fields and show updated data
+                    else:
+                        st.error("Failed to add record to Firestore.")
+
+            elif action == "Edit Existing Record":
+                st.subheader("Edit Existing Record")
+                if not current_df.empty:
+                    # Use the primary ID column for selection
+                    primary_id_col = next((col for col in fields_config if "ID" in col or "Number" in col), None)
+                    if primary_id_col is None:
+                        st.error("Cannot find a suitable ID column for editing. Please ensure one of your module fields contains 'ID' or 'Number'.")
+                        return
+
+                    record_to_edit_id = st.selectbox(f"Select Record by {primary_id_col}", options=current_df[primary_id_col].tolist())
+                    
+                    if record_to_edit_id:
+                        selected_record = current_df[current_df[primary_id_col] == record_to_edit_id].iloc[0].to_dict()
+                        selected_doc_id = selected_record.get('doc_id') # Get Firestore doc_id
+
+                        edited_data = {}
+                        for field_name, config in fields_config.items():
+                            if field_name == primary_id_col or field_name == "Company":
+                                st.text_input(f"{field_name}:", value=selected_record.get(field_name), disabled=True)
+                                continue # Skip disabled fields
+                            
+                            current_value = selected_record.get(field_name)
+
+                            if config["editable"]:
+                                if config["type"] == "text":
+                                    edited_data[field_name] = st.text_input(f"{field_name}:", value=str(current_value) if current_value is not None else "")
+                                elif config["type"] == "number":
+                                    edited_data[field_name] = st.number_input(f"{field_name}:", value=float(current_value) if current_value is not None else 0.0, format="%.2f" if "INR" in field_name else "%d")
+                                elif config["type"] == "date":
+                                    if isinstance(current_value, datetime.date):
+                                        value_date = current_value
+                                    elif isinstance(current_value, str):
+                                        try:
+                                            value_date = datetime.datetime.strptime(current_value, "%Y-%m-%d").date()
+                                        except ValueError:
+                                            value_date = datetime.date.today()
+                                    else:
+                                        value_date = datetime.date.today()
+                                    edited_data[field_name] = st.date_input(f"{field_name}:", value=value_date)
+                                elif config["type"] == "datetime":
+                                    dt_val = None
+                                    if isinstance(current_value, str):
+                                        try:
+                                            dt_val = datetime.datetime.strptime(current_value, "%Y-%m-%d %H:%M:%S")
+                                        except ValueError:
+                                            pass
+                                    
+                                    date_val_init = dt_val.date() if dt_val else datetime.date.today()
+                                    time_val_init = dt_val.time() if dt_val else datetime.time(0, 0)
+
+                                    date_val = st.date_input(f"{field_name} (Date):", value=date_val_init, key=f"edit_{field_name}_date_{record_to_edit_id}")
+                                    time_val = st.time_input(f"{field_name} (Time):", value=time_val_init, key=f"edit_{field_name}_time_{record_to_edit_id}")
+                                    edited_data[field_name] = f"{date_val} {time_val}" if date_val and time_val else None
+                                elif config["type"] == "select":
+                                    index = config["options"].index(current_value) if current_value in config["options"] else 0
+                                    edited_data[field_name] = st.selectbox(f"{field_name}:", options=config["options"], index=index)
+                                elif config["type"] == "textarea":
+                                    edited_data[field_name] = st.text_area(f"{field_name}:", value=str(current_value) if current_value is not None else "")
+                                elif config["type"] == "json_table":
+                                    st.write(f"**{field_name}:** (Edit Items below)")
+                                    try:
+                                        current_items = json.loads(current_value) if isinstance(current_value, str) else current_value
+                                        if not isinstance(current_items, list):
+                                            current_items = []
+                                    except (json.JSONDecodeError, TypeError):
+                                        current_items = []
+
+                                    num_items = st.number_input("Number of Items", min_value=1, value=len(current_items) if current_items else 1, key=f"num_items_edit_{record_to_edit_id}")
+                                    
+                                    items_list = []
+                                    for i in range(int(num_items)):
+                                        st.markdown(f"***Item {i+1}***")
+                                        item_desc_val = current_items[i].get('Description', '') if i < len(current_items) else ''
+                                        item_qty_val = float(current_items[i].get('Quantity', 0)) if i < len(current_items) else 1.0
+                                        item_price_val = float(current_items[i].get('Unit Price', 0)) if i < len(current_items) else 0.0
+                                        
+                                        item_description = st.text_input(f"Description (Item {i+1})", value=item_desc_val, key=f"edit_item_desc_{record_to_edit_id}_{i}")
+                                        item_quantity = st.number_input(f"Quantity (Item {i+1})", min_value=0.0, value=item_qty_val, key=f"edit_item_qty_{record_to_edit_id}_{i}")
+                                        item_unit_price = st.number_input(f"Unit Price (Item {i+1})", min_value=0.0, value=item_price_val, format="%.2f", key=f"edit_item_price_{record_to_edit_id}_{i}")
+                                        item_amount = item_quantity * item_unit_price
+                                        st.write(f"Calculated Amount: {item_amount:,.2f} INR")
+                                        items_list.append({
+                                            "Description": item_description,
+                                            "Quantity": item_quantity,
+                                            "Unit Price": item_unit_price,
+                                            "Amount": item_amount
+                                        })
+                                    edited_data[field_name] = json.dumps(items_list) # Store as JSON string
+
+                        else:
+                            edited_data[field_name] = current_value # For non-editable but existing fields
+
+                        
+                        # Add the company name back into the data for saving if it's implicitly needed by Firestore
+                        if 'Company' not in edited_data:
+                            edited_data['Company'] = st.session_state['company_name']
+
+                        # Apply calculations before saving
+                        temp_df = pd.DataFrame([edited_data])
+                        temp_df = apply_calculations(temp_df, selected_module)
+                        data_to_save = temp_df.iloc[0].to_dict() # Get the calculated values
+
+                        # Remove doc_id from data_to_save if it somehow got in there
+                        data_to_save.pop('doc_id', None)
+
+                        if st.button("Update Record"):
+                            if firestore_update_document(company_id_for_data_ops, collection_name, selected_doc_id, data_to_save):
+                                st.success("Record updated successfully!")
+                                # Reload data after updating
+                                st.session_state[df_key] = load_data(company_id_for_data_ops, selected_module)
+                                st.rerun()
+                            else:
+                                st.error("Failed to update record in Firestore.")
+                else:
+                    st.info("No records to edit.")
+
+            elif action == "Delete Record":
+                st.subheader("Delete Record")
+                if not current_df.empty:
+                    primary_id_col = next((col for col in fields_config if "ID" in col or "Number" in col), None)
+                    if primary_id_col is None:
+                        st.error("Cannot find a suitable ID column for deletion. Please ensure one of your module fields contains 'ID' or 'Number'.")
+                        return
+
+                    record_to_delete_id = st.selectbox(f"Select Record by {primary_id_col} to Delete", options=current_df[primary_id_col].tolist())
+                    
+                    if record_to_delete_id:
+                        selected_record = current_df[current_df[primary_id_col] == record_to_delete_id].iloc[0]
+                        selected_doc_id = selected_record.get('doc_id')
+
+                        st.warning(f"Are you sure you want to delete the record with {primary_id_col}: **{record_to_delete_id}**?")
+                        if st.button("Confirm Delete"):
+                            if firestore_delete_document(company_id_for_data_ops, collection_name, selected_doc_id):
+                                st.success("Record deleted successfully!")
+                                # Reload data after deleting
+                                st.session_state[df_key] = load_data(company_id_for_data_ops, selected_module)
+                                st.rerun()
+                            else:
+                                st.error("Failed to delete record from Firestore.")
+                else:
+                    st.info("No records to delete.")
+
+            elif action == "Generate Report":
+                st.subheader(f"Generate {selected_module} Report")
+                if not current_df.empty:
+                    # Drop 'doc_id' for reports
+                    report_df = current_df.drop(columns=['doc_id'], errors='ignore')
+
+                    col_rpt1, col_rpt2 = st.columns(2)
+
+                    with col_rpt1:
+                        excel_report_data = generate_excel_report(report_df, f"{selected_module}_Report.xlsx")
+                        st.download_button(
+                            label="Download Excel Report",
+                            data=excel_report_data,
+                            file_name=f"{st.session_state['company_name'].replace(' ', '_')}_{selected_module}_Report_{datetime.date.today().strftime('%Y%m%d')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                        )
+                    
+                    with col_rpt2:
+                        # Special handling for Invoice PDF
+                        if selected_module == "Invoicing & Quoting":
+                            st.info("Select an invoice to generate a detailed PDF.")
+                            invoice_numbers = report_df['Inv Number'].tolist()
+                            selected_invoice_num = st.selectbox("Select Invoice Number", options=invoice_numbers)
+                            if selected_invoice_num:
+                                invoice_data = report_df[report_df['Inv Number'] == selected_invoice_num].iloc[0].to_dict()
+                                # Mock Logo URL and positioning for demonstration
+                                # Replace with actual logo URL and appropriate x, y, width, height for your letterhead
+                                mock_logo_url = "https://i.ibb.co/vYc4XjC/concord-logo.jpg" 
+                                logo_x = 10 # Example X position (mm)
+                                logo_y = 10 # Example Y position (mm)
+                                logo_width = 30 # Example width (mm)
+                                logo_height = 15 # Example height (mm)
+
+                                invoice_pdf_output = generate_single_tax_invoice_pdf(
+                                    invoice_data,
+                                    st.session_state['company_name'],
+                                    st.session_state['USER_DB'][st.session_state['company_id']]['company_pin'],
+                                    mock_logo_url, logo_x, logo_y, logo_width, logo_height
+                                )
+                                st.download_button(
+                                    label=f"Download Invoice {selected_invoice_num} (PDF)",
+                                    data=invoice_pdf_output,
+                                    file_name=f"Invoice_{selected_invoice_num}_{datetime.date.today().strftime('%Y%m%d')}.pdf",
+                                    mime="application/pdf"
+                                )
+                            
+                        else:
+                            pdf_report_data = generate_pdf_report(report_df, f"{selected_module} Report for {st.session_state['company_name']}")
+                            st.download_button(
+                                label="Download PDF Report",
+                                data=pdf_report_data,
+                                file_name=f"{st.session_state['company_name'].replace(' ', '_')}_{selected_module}_Report_{datetime.date.today().strftime('%Y%m%d')}.pdf",
+                                mime="application/pdf"
+                            )
+                else:
+                    st.info("No data available to generate a report.")
+
+if __name__ == "__main__":
+    main()
