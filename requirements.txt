@@ -7,3 +7,4 @@ fpdf==1.7.2
 num2words==0.5.11
 firebase-admin==6.5.0
 cryptography==45.0.4
+xlsxwriter==3.2.5
