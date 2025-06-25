@@ -102,8 +102,8 @@ if 'USER_DB' not in st.session_state:
 FIREBASE_SERVICE_ACCOUNT_KEY_JSON = {
   "type": "service_account",
   "project_id": "logisticapp-63967",
-  "private_key_id": "0d6580bd98316822e963d66fac06fc2d5f502309",
-  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDR+JiPLI+/CygP\nbfHfv+zqbhx2F6OI9vbM3/M13uc1bAUlSkJfeHgAbAtaEbt4ZIRlSE/a76Rz9ZEW\noLYFTjvkJRguesopO3gi2GwqCUMNnlBEKR4mMFBIP77gUQn/I0FixUXB+JMwsrbV\nd9uaD5jLvEW9lBoyX/DVvoQYMfnMfC5MZz0wftrPEC8c23pZ8N/Jg/tQYzxbCfiU\nWTwkP1Ll3r1kyDDO/otYGqg7r+BqWlGqJZqzWjOxktua0KvUD6ARR2ImqcbhU5Xn\nMBT6deQoqHduNDfU3Qj/eQ5CW9occpmPw1cY4q3S5NwJHhnxaA9k2sK50x+LpUVm\noE/u9JQbAgMBAAECggI\n----------\n-----END PRIVATE KEY-----\n",
+  "private_key_id": "a61f0c389a0ce983d8510c1849c91d490b63bf54",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQDZiV79HNnbbcUo\nnwqJgi5n8p8PjR+iWxHdkKMST8Du3qTLpbVuyqcbVndtKH0vXOKTE4ztwdlxPsfK\n8/fA6iWSgBQObR7PiEkTmywMZFEuW+6eNtE3KKiH5wc/axzV9hI/wJnRm/PKpIk5\n6wydKGP2aTREVLYJ1jBFLH+HfgQTlj9Bug+oeUAGbmCWe1IlGYxx5BH12PYMUCXo\nn8XqGGkcQgSwZxsI5tavYtcnWFpYLM23aTKKBRuSZ5k2+BEaGftuAnyCkXRhSESU\nqWwI0ZsFx1+HGQjlFpwFvsr6T/ZxPNCO/peeFkSUhw+ozHD5LGPAkOae77s3YljM\nlZGumQT3AgMBAAECggEAA4DeU7SHOeXPIwnNtbuOwFNVZ4hJNrZ6WgNXxiuXy1nu\nU+mDKLiRgBAxMGBcBM2a/HcP3KicLK4KEK/R30rGEndlsv8vrGrQYbuefUQVJYIL\nCaBDhzyutUPToY4T2zLNrmYD6q7bA+vjAAgkhC2T9YVSMEzKzrKGqKwq6y24nQx7\naGa1Lf+qwYDvTjStKE7hn5ibPOqZAk1Uckt7Rz+UWU0ieo8VMCW6LDB3B8LGqZ2X\nJjRfJxvvDbhjyIEwGHIBCiqomWFyms72Tr/FKvMl6EFv0uk9+pPC/jJfYxMODgAl\nvPjr9WqZfABZzalYgMCDxq516vKDUe+eehi3n5nehQKBgQD2rznJp/Jona7CPVKX\nRB9oU/0EPxkFOrSpvq/NbpLXFUHYxuRzTckdJ4hcMK/uFfmqnox79Al8JOBo5V0O\nNhglNTXXYfKhDLbOZp1DDCUtqyNAli/qB+MlW4KYa+ApIY0OGPcKl5+otOqyfwF+\nHH5/VkdKaH5IlxTeaiGZR8YwOwKBgQDhwF0rddzUh3Fjq+vwCCzRlY/gIJpvj4w4\neMYZlqCT0kukyeR0Snt2sEoiOeUh29QGkQ/XDAdXpVLB12wk1T3Ung0EcrYfY0MW\nDGCdIJ6nk0u6monoKyKdzTQeg58bnkSTlsCq2A4jzSnLSAe3ZEbsibB/iJWzwOwO\n1G4i4MlOdQKBgQCR8JCLkOSEp+Tf3U+jVhYOrsGdZYbz5QtE8R8otiYBQP43tVMq\nM/arXNv7ToKGpFGUc0BBhNqnq1loNWmcIryeJqC3z6avSMpNyb94DxNftUOhzjiC\niDAFxeG5Mvjm3IaKtJJSnelC8eV3vFOxvEHKK8z5ZGBxqZAbFUbTW/cQSQKBgDUS\nUxT3hW3VVZvX/ASW92piHcvT/lqBxbY09mVnmuKFitD3waRxKitR8GuxbqOSGXtd\nuPqWUleRfy4g5cSW+Q02Bttn2Fbyr//L8x6dX48HusLot8kD8wRkDH+r88i7YWXN\nCAhh+JkED3JBwcakZWQQTpT82CzFCvnFiQrcC5dNAoGBAMLBSbFD5qhavoKFr9id\nO+k8u+uLtPdIFzt/qjFZ7SIuJ/JK2uoCn3CDhd7jst7qL9p1zXVm/AntJnHSmmgh\n8LnC9QxGe5QeLdHNEwMbBMsC3ArRY2UOTIN00D6MKvNpW9n7eL3/Q+PHtM3CYdpR\nuN+mkMtSGwPi63/Z0GewkJDi\n-----END PRIVATE KEY-----\n",
   "client_email": "firebase-adminsdk-fbsvc@logisticapp-63967.iam.gserviceaccount.com",
   "client_id": "116053489571436273496",
   "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -115,15 +115,34 @@ FIREBASE_SERVICE_ACCOUNT_KEY_JSON = {
 
 # IMPORTANT FIX: Ensure private_key is correctly formatted with actual newlines
 # and remove any non-standard "----------" lines that might be present from copy-pasting.
-cleaned_private_key_lines = []
-# First, convert escaped newlines
-temp_private_key = FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key'].replace('\\n', '\n')
+# This also attempts to fix InvalidPadding by correctly padding the base64 data.
 
-# Then, split by lines and filter out any "----------" lines
-for line in temp_private_key.splitlines():
-    if line.strip() != '----------':
-        cleaned_private_key_lines.append(line)
+original_private_key_string = FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key']
+cleaned_private_key_lines = []
+in_base64_block = False
+
+for line in original_private_key_string.splitlines():
+    stripped_line = line.strip()
+    if stripped_line.startswith("-----BEGIN"):
+        cleaned_private_key_lines.append(stripped_line)
+        in_base64_block = True
+    elif stripped_line.startswith("-----END"):
+        in_base64_block = False
+        cleaned_private_key_lines.append(stripped_line)
+    elif in_base64_block and stripped_line != '----------': # Only process content within BEGIN/END block
+        # Attempt to correct base64 padding
+        # Base64 string length must be a multiple of 4. Pad with '=' if needed.
+        if stripped_line: # Ensure it's not an empty line within the block
+            padding_needed = len(stripped_line) % 4
+            if padding_needed > 0:
+                stripped_line += '=' * (4 - padding_needed)
+        cleaned_private_key_lines.append(stripped_line)
+    elif not in_base64_block and stripped_line != '----------':
+        # Add lines outside base64 block if they are not the '----------' separators
+        cleaned_private_key_lines.append(stripped_line)
+
 FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key'] = '\n'.join(cleaned_private_key_lines)
+
 
 FIREBASE_PROJECT_ID = FIREBASE_SERVICE_ACCOUNT_KEY_JSON['project_id']
 FIRESTORE_ROOT_COLLECTION = "logistic_app_data" # User specified this
