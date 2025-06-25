@@ -577,7 +577,7 @@ def generate_single_tax_invoice_pdf(invoice_data, company_name_actual, company_p
     # Add background watermark (if not part of the background image, or to overlay)
     pdf.set_font("Arial", "B", 80)
     pdf.set_text_color(200, 200, 200) # Light gray
-    # pdf.text(pdf.w / 2 - pdf.get_string_width("INVOICE") / 2, pdf.h / 2 + 10, "INVOICE")
+    pdf.text(pdf.w / 2 - pdf.get_string_width("INVOICE") / 2, pdf.h / 2 + 10, "INVOICE")
     pdf.set_text_color(0, 0, 0) # Reset text color
 
     # --- Customizable Logo (separate from background, top left) ---
@@ -594,20 +594,20 @@ def generate_single_tax_invoice_pdf(invoice_data, company_name_actual, company_p
     pdf.set_text_color(50, 50, 50) # Darker gray for header text
     
     # # Example header content (replace with actual data for your company if not in background image)
-    # pdf.set_x(10) # Align with left margin
-    # pdf.cell(0, 5, "EAST CONCORD W.L.L", 0, 1, "L")
-    # pdf.set_x(50)
-    # pdf.cell(0, 5, "Flat/Shop No. 11, Building 471", 0, 1, "L")
-    # pdf.set_x(10)
-    # pdf.cell(0, 5, "Road/Shop 3513, MANAMA", 0, 1, "L")
-    # pdf.set_x(10)
-    # pdf.cell(0, 5, "UMM AL-HASSAM, Kingdom of Bahrain", 0, 1, "L")
-    # pdf.set_x(10)
-    # pdf.cell(0, 5, f"TRN: {company_pin_actual}", 0, 1, "L") # Using company_pin as TRN example
-    # pdf.set_x(10)
-    # pdf.cell(0, 5, "Email: concord@email.com (Mock)", 0, 1, "L")
-    # pdf.ln(5) # Space after header details
-    # pdf.set_text_color(0, 0, 0) # Reset text color
+     pdf.set_x(10) # Align with left margin
+     pdf.cell(0, 5, "EAST CONCORD W.L.L", 0, 1, "L")
+     pdf.set_x(50)
+     pdf.cell(0, 5, "Flat/Shop No. 11, Building 471", 0, 1, "L")
+     pdf.set_x(10)
+     pdf.cell(0, 5, "Road/Shop 3513, MANAMA", 0, 1, "L")
+     pdf.set_x(10)
+     pdf.cell(0, 5, "UMM AL-HASSAM, Kingdom of Bahrain", 0, 1, "L")
+     pdf.set_x(10)
+     pdf.cell(0, 5, f"TRN: {company_pin_actual}", 0, 1, "L") # Using company_pin as TRN example
+     pdf.set_x(10)
+     pdf.cell(0, 5, "Email: concord@email.com (Mock)", 0, 1, "L")
+     pdf.ln(5) # Space after header details
+     pdf.set_text_color(0, 0, 0) # Reset text color
 
 
     pdf.set_y(pdf.get_y() + 5) # Ensure content starts below the custom header
@@ -1004,30 +1004,30 @@ def display_module(module_name, fields_config, sample_data_key=None, crud_enable
                     # Find the selected invoice data
                     selected_invoice_data = filtered_df[filtered_df['Inv Number'] == selected_invoice_number].iloc[0].to_dict()
                     
-            #         if st.button(f"Download Tax Invoice PDF for {selected_invoice_number}", key=f"{actual_company_id_for_filter}_{selected_invoice_number}_invoice_pdf_download"):
-            #             # Pass actual company name and pin for the invoice header
-            #             tax_invoice_pdf_data = generate_single_tax_invoice_pdf(
-            #                 selected_invoice_data,
-            #                 actual_company_name_for_filter,
-            #                 st.session_state['USER_DB'][actual_company_id_for_filter]['company_pin'],
-            #                 logo_url=logo_url_input,
-            #                 logo_x=logo_x_pos,
-            #                 logo_y=logo_y_pos,
-            #                 logo_width=logo_width_fixed, # Using fixed width
-            #                 logo_height=logo_height_fixed # Using fixed height
-            #             )
-            #             st.download_button(
-            #                 label=f"Download Invoice {selected_invoice_number} PDF",
-            #                 data=tax_invoice_pdf_data, # Data is already bytes
-            #                 file_name=f"Tax_Invoice_{selected_invoice_number}.pdf",
-            #                 mime="application/pdf",
-            #                 key=f"{actual_company_id_for_filter}_{selected_invoice_number}_pdf_download_final"
-            #             )
-            #             st.success(f"Tax Invoice PDF for {selected_invoice_number} generated successfully!")
-            #     else:
-            #         st.info("No invoices available for PDF generation in the current view.")
-            # else:
-            #     st.info("No invoices available for PDF generation. Please add invoice entries first.")
+                     if st.button(f"Download Tax Invoice PDF for {selected_invoice_number}", key=f"{actual_company_id_for_filter}_{selected_invoice_number}_invoice_pdf_download"):
+                         # Pass actual company name and pin for the invoice header
+                         tax_invoice_pdf_data = generate_single_tax_invoice_pdf(
+                             selected_invoice_data,
+                             actual_company_name_for_filter,
+                             st.session_state['USER_DB'][actual_company_id_for_filter]['company_pin'],
+                             logo_url=logo_url_input,
+                             logo_x=logo_x_pos,
+                             logo_y=logo_y_pos,
+                             logo_width=logo_width_fixed, # Using fixed width
+                             logo_height=logo_height_fixed # Using fixed height
+                         )
+                         st.download_button(
+                             label=f"Download Invoice {selected_invoice_number} PDF",
+                             data=tax_invoice_pdf_data, # Data is already bytes
+                             file_name=f"Tax_Invoice_{selected_invoice_number}.pdf",
+                             mime="application/pdf",
+                             key=f"{actual_company_id_for_filter}_{selected_invoice_number}_pdf_download_final"
+                         )
+                         st.success(f"Tax Invoice PDF for {selected_invoice_number} generated successfully!")
+                 else:
+                     st.info("No invoices available for PDF generation in the current view.")
+             else:
+                 st.info("No invoices available for PDF generation. Please add invoice entries first.")
         # --- End of New Invoice PDF Generation ---
 
         st.subheader(f"Download {module_name} Reports for {actual_company_name_for_filter}")
@@ -1041,15 +1041,15 @@ def display_module(module_name, fields_config, sample_data_key=None, crud_enable
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 key=f"{actual_company_id_for_filter}_{module_name}_excel_download"
             )
-        # with col2:
-        #     pdf_data = generate_pdf_report(current_company_data.drop(columns=['doc_id'], errors='ignore'), f"{module_name} Report for {actual_company_name_for_filter}")
-        #     st.download_button(
-        #         label=f"Download {module_name} PDF ({actual_company_name_for_filter})",
-        #         data=pdf_data, # Data is already bytes
-        #         file_name=f"Report_{module_name}_Report_{actual_company_name_for_filter}_{datetime.date.today()}.pdf",
-        #         mime="application/pdf",
-        #         key=f"{actual_company_id_for_filter}_{module_name}_pdf_download"
-        #     )
+        with col2:
+             pdf_data = generate_pdf_report(current_company_data.drop(columns=['doc_id'], errors='ignore'), f"{module_name} Report for {actual_company_name_for_filter}")
+             st.download_button(
+                 label=f"Download {module_name} PDF ({actual_company_name_for_filter})",
+                 data=pdf_data, # Data is already bytes
+                 file_name=f"Report_{module_name}_Report_{actual_company_name_for_filter}_{datetime.date.today()}.pdf",
+                 mime="application/pdf",
+                 key=f"{actual_company_id_for_filter}_{module_name}_pdf_download"
+             )
 
         st.markdown("---")
         st.info("Note: Data is persisted in Firebase Firestore. Reloading the app will NOT reset data.")
@@ -1511,14 +1511,14 @@ def main_app():
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="all_companies_consolidated_excel_download"
                     )
-                # with col_pdf_overall:
-                #     st.download_button(
-                #         label="Download All Companies Consolidated PDF",
-                #         data=generate_pdf_report(all_operational_data_concat.drop(columns=['doc_id'], errors='ignore'), "All Companies Consolidated Report"),
-                #         file_name=f"All_Companies_Consolidated_Report_{datetime.date.today()}.pdf",
-                #         mime="application/pdf",
-                #         key="all_companies_consolidated_pdf_download"
-                #     )
+                 with col_pdf_overall:
+                     st.download_button(
+                         label="Download All Companies Consolidated PDF",
+                         data=generate_pdf_report(all_operational_data_concat.drop(columns=['doc_id'], errors='ignore'), "All Companies Consolidated Report"),
+                         file_name=f"All_Companies_Consolidated_Report_{datetime.date.today()}.pdf",
+                         mime="application/pdf",
+                         key="all_companies_consolidated_pdf_download"
+                     )
             else:
                 st.info("No operational data available across all companies yet. Please add data using individual company logins.")
 
@@ -1537,29 +1537,29 @@ def main_app():
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key="all_trips_excel_download"
                     )
-                # with col_pdf:
-                #     st.download_button(
-                #         label="Download All Trips PDF",
-                #         data=generate_pdf_report(all_trips_df.drop(columns=['doc_id'], errors='ignore'), "All Trips Report"),
-                #         file_name=f"All_Trips_Report_{datetime.date.today()}.pdf",
-                #         mime="application/pdf",
-                #         key="all_trips_pdf_download"
-                #     )
+                 with col_pdf:
+                     st.download_button(
+                         label="Download All Trips PDF",
+                         data=generate_pdf_report(all_trips_df.drop(columns=['doc_id'], errors='ignore'), "All Trips Report"),
+                         file_name=f"All_Trips_Report_{datetime.date.today()}.pdf",
+                         mime="application/pdf",
+                         key="all_trips_pdf_download"
+                     )
             else:
                 st.info("No trip data available for cross-company reports yet.")
             
             st.markdown("---")
             st.markdown("#### Custom Management Report (PDF with Company Details)")
             st.write("This PDF report provides an overview of all companies, including their individual vehicle counts, employees, and financial summaries.")
-            # if st.button("Download Management Report (PDF)", key="download_management_pdf_final"):
-            #     management_pdf_data = generate_management_pdf_report(all_companies_operational_data, USER_DB_CURRENT)
-            #     st.download_button(
-            #         label="Download Management Report PDF",
-            #         data=management_pdf_data,
-            #         file_name=f"Management_Report_{datetime.date.today()}.pdf",
-            #         mime="application/pdf",
-            #         key="management_pdf_download_final"
-            #     )
+             if st.button("Download Management Report (PDF)", key="download_management_pdf_final"):
+                 management_pdf_data = generate_management_pdf_report(all_companies_operational_data, USER_DB_CURRENT)
+                 st.download_button(
+                     label="Download Management Report PDF",
+                     data=management_pdf_data,
+                     file_name=f"Management_Report_{datetime.date.today()}.pdf",
+                     mime="application/pdf",
+                     key="management_pdf_download_final"
+                 )
 
 
         elif menu_selection == "User & Company Management":
@@ -1775,15 +1775,15 @@ def main_app():
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key=f"admin_{selected_company_id_for_modules}_payroll_excel_download"
                         )
-                    # with col2:
-                    #     pdf_data = generate_pdf_report(current_company_payslips.drop(columns=['doc_id'], errors='ignore'), f"Payroll Report ({selected_company_name_for_modules})")
-                    #     st.download_button(
-                    #         label=f"Download Payroll PDF ({selected_company_name_for_modules})",
-                    #         data=pdf_data,
-                    #         file_name=f"Payroll_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
-                    #         mime="application/pdf",
-                    #         key=f"admin_{selected_company_id_for_modules}_payroll_pdf_download"
-                    #     )
+                     with col2:
+                         pdf_data = generate_pdf_report(current_company_payslips.drop(columns=['doc_id'], errors='ignore'), f"Payroll Report ({selected_company_name_for_modules})")
+                         st.download_button(
+                             label=f"Download Payroll PDF ({selected_company_name_for_modules})",
+                             data=pdf_data,
+                             file_name=f"Payroll_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
+                             mime="application/pdf",
+                             key=f"admin_{selected_company_id_for_modules}_payroll_pdf_download"
+                         )
 
                     st.markdown("---")
 
@@ -1791,20 +1791,20 @@ def main_app():
 
                 display_module("VAT Input/Output", VAT_INPUT_OUTPUT_FIELDS, sample_data_key='vat_transactions', crud_enabled=True, company_filter_id=selected_company_id_for_modules)
                 
-                # with st.expander(f"**VAT Return Report for {selected_company_name_for_modules}**"):
-                #     st.subheader(f"VAT Return Report ({selected_company_name_for_modules}) (Placeholder)")
-                #     st.info("Automate VAT calculation and generate VAT return reports here.")
-                #     if st.button(f"Generate VAT Return Report ({selected_company_name_for_modules})", key=f"admin_{selected_company_id_for_modules}_generate_vat_report"):
-                #         vat_data_for_report = firestore_get_collection(selected_company_id_for_modules, 'vat_transactions')
-                #         vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id'], errors='ignore'), f"VAT Return Report for {selected_company_name_for_modules}")
-                #         st.download_button(
-                #             label=f"Download VAT Return Report PDF ({selected_company_name_for_modules})",
-                #             data=vat_report_pdf,
-                #             file_name=f"VAT_Return_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
-                #             mime="application/pdf",
-                #             key=f"admin_{selected_company_id_for_modules}_vat_pdf_download"
-                #         )
-                #         st.success(f"VAT Return Report generated (placeholder) for {selected_company_name_for_modules}.")
+                 with st.expander(f"**VAT Return Report for {selected_company_name_for_modules}**"):
+                     st.subheader(f"VAT Return Report ({selected_company_name_for_modules}) (Placeholder)")
+                     st.info("Automate VAT calculation and generate VAT return reports here.")
+                     if st.button(f"Generate VAT Return Report ({selected_company_name_for_modules})", key=f"admin_{selected_company_id_for_modules}_generate_vat_report"):
+                         vat_data_for_report = firestore_get_collection(selected_company_id_for_modules, 'vat_transactions')
+                         vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id'], errors='ignore'), f"VAT Return Report for {selected_company_name_for_modules}")
+                         st.download_button(
+                             label=f"Download VAT Return Report PDF ({selected_company_name_for_modules})",
+                             data=vat_report_pdf,
+                             file_name=f"VAT_Return_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
+                             mime="application/pdf",
+                             key=f"admin_{selected_company_id_for_modules}_vat_pdf_download"
+                         )
+                         st.success(f"VAT Return Report generated (placeholder) for {selected_company_name_for_modules}.")
 
 
             else:
@@ -1988,15 +1988,15 @@ def main_app():
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     key=f"{st.session_state['company_id']}_payroll_excel_download"
                 )
-            # with col2:
-            #     pdf_data = generate_pdf_report(current_company_payslips.drop(columns=['doc_id'], errors='ignore'), "Payroll Report")
-            #     st.download_button(
-            #         label="Download Payroll PDF",
-            #         data=pdf_data,
-            #         file_name=f"Payroll_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
-            #         mime="application/pdf",
-            #         key=f"{st.session_state['company_id']}_payroll_pdf_download"
-            #     )
+             with col2:
+                 pdf_data = generate_pdf_report(current_company_payslips.drop(columns=['doc_id'], errors='ignore'), "Payroll Report")
+                 st.download_button(
+                     label="Download Payroll PDF",
+                     data=pdf_data,
+                     file_name=f"Payroll_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
+                     mime="application/pdf",
+                     key=f"{st.session_state['company_id']}_payroll_pdf_download"
+                 )
 
 
         elif selected_module == "Planning & Time Off":
@@ -2030,14 +2030,14 @@ def main_app():
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         key=f"{st.session_state['company_id']}_consolidated_excel"
                     )
-                # with col_pdf_all:
-                #     st.download_button(
-                #         label=f"Download Consolidated {st.session_state['company_name']} PDF",
-                #         data=generate_pdf_report(all_company_data_for_user_concat.drop(columns=['doc_id'], errors='ignore'), f"{st.session_state['company_name']} Consolidated Report"),
-                #         file_name=f"{st.session_state['company_name']}_Consolidated_Report_{datetime.date.today()}.pdf",
-                #         mime="application/pdf",
-                #         key=f"{st.session_state['company_id']}_consolidated_pdf"
-                #     )
+                 with col_pdf_all:
+                     st.download_button(
+                         label=f"Download Consolidated {st.session_state['company_name']} PDF",
+                         data=generate_pdf_report(all_company_data_for_user_concat.drop(columns=['doc_id'], errors='ignore'), f"{st.session_state['company_name']} Consolidated Report"),
+                         file_name=f"{st.session_state['company_name']}_Consolidated_Report_{datetime.date.today()}.pdf",
+                         mime="application/pdf",
+                         key=f"{st.session_state['company_id']}_consolidated_pdf"
+                     )
             else:
                 st.info(f"No data available to generate a consolidated report for {st.session_state['company_name']} yet. Please add data in other modules.")
 
@@ -2085,17 +2085,17 @@ def main_app():
             st.write("Output VAT from Sales Invoices.")
             st.write("Input VAT from Purchases.")
             st.write("Auto-generate VAT Return Report for export.")
-            # if st.button("Generate VAT Return Report", key=f"{st.session_state['company_id']}_generate_vat_report"):
-            #     vat_data_for_report = firestore_get_collection(st.session_state['company_id'], 'vat_transactions')
-            #     vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id'], errors='ignore'), f"VAT Return Report for {st.session_state['company_name']}")
-            #     st.download_button(
-            #         label=f"Download VAT Return Report PDF ({st.session_state['company_name']})",
-            #         data=vat_report_pdf,
-            #         file_name=f"VAT_Return_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
-            #         mime="application/pdf",
-            #         key=f"{st.session_state['company_id']}_vat_pdf_download"
-            #     )
-                # st.success("VAT Return Report generated (placeholder).")
+             if st.button("Generate VAT Return Report", key=f"{st.session_state['company_id']}_generate_vat_report"):
+                 vat_data_for_report = firestore_get_collection(st.session_state['company_id'], 'vat_transactions')
+                 vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id'], errors='ignore'), f"VAT Return Report for {st.session_state['company_name']}")
+                 st.download_button(
+                     label=f"Download VAT Return Report PDF ({st.session_state['company_name']})",
+                     data=vat_report_pdf,
+                     file_name=f"VAT_Return_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
+                     mime="application/pdf",
+                     key=f"{st.session_state['company_id']}_vat_pdf_download"
+                 )
+                 st.success("VAT Return Report generated (placeholder).")
 
 
     st.sidebar.markdown("---")
