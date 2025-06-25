@@ -6,9 +6,9 @@ from fpdf import FPDF
 import datetime
 import plotly.express as px
 import plotly.graph_objects as go
-from num2words import num2words # Import for converting numbers to words for invoice amounts
+from num2words import num2words
 import sqlite3
-import uuid # For generating unique IDs for SQLite records
+import uuid
 
 # --- Configuration for Company Authentication and Details ---
 
@@ -19,22 +19,22 @@ INITIAL_USER_DB_STRUCTURE = {
         "company_name": "EAST CONCORD W.L.L",
         "company_pin": "EAST", # Simplified PIN for login
         "users": {
-            "east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
-            "east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "john_east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "jane_east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
         }
     },
     "sa_concord_international": {
         "company_name": "S.A. CONCORD INTERNATIONAL CARGO HANDLING CO W.L.L",
         "company_pin": "SA",
         "users": {
-            "sa": {"password_hash": bcrypt.hashpw("sa123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "peter_sa": {"password_hash": bcrypt.hashpw("sa123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
         }
     },
     "north_concord_cargo": {
         "company_name": "NORTH CONCORD CARGO HANDLING CO W.L.L",
         "company_pin": "NORTH",
         "users": {
-            "north": {"password_hash": bcrypt.hashpw("north123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "alice_north": {"password_hash": bcrypt.hashpw("north123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
         }
     },
     "management_company": {
@@ -77,20 +77,6 @@ COMPANY_PROFILES = {
         "phone": "Tel: 99887766 | Mob: 44332211"
     }
 }
-
-
-# --- Initialize Session State ---
-if 'logged_in' not in st.session_state:
-    st.session_state['logged_in'] = False
-    st.session_state['company_id'] = None
-    st.session_state['user_id'] = None
-    st.session_state['company_name'] = None
-    st.session_state['role'] = None
-    st.session_state['admin_selected_company_for_modules_name'] = None
-
-# Initialize USER_DB in session state (this will be populated from SQLite)
-if 'USER_DB' not in st.session_state:
-    st.session_state['USER_DB'] = {}
 
 
 # --- Specific Module Field Configurations ---
@@ -219,6 +205,20 @@ MODULE_FIELDS_MAP = {
     'leaves': PLANNING_TIMEOFF_FIELDS,
     'vat_transactions': VAT_INPUT_OUTPUT_FIELDS
 }
+
+# --- Initialize Session State ---
+if 'logged_in' not in st.session_state:
+    st.session_state['logged_in'] = False
+    st.session_state['company_id'] = None
+    st.session_state['user_id'] = None
+    st.session_state['company_name'] = None
+    st.session_state['role'] = None
+    st.session_state['admin_selected_company_for_modules_name'] = None
+
+# Initialize USER_DB in session state (this will be populated from SQLite)
+if 'USER_DB' not in st.session_state:
+    st.session_state['USER_DB'] = {}
+
 
 # --- SQLite Database Initialization and Operations ---
 DB_NAME = 'logistic_erp.db'
@@ -409,7 +409,7 @@ def add_db_document(company_id, collection_name, data):
     data['company_id'] = company_id
     # Get company name from USER_DB_STRUCTURE if not already in data
     if 'Company' not in data:
-        for comp_id, comp_details in INITIAL_USER_DB_STRUCTURE.items():
+        for comp_id, comp_details in INITIAL_USER_DB_STRUCTURE.items(): # Use INITIAL_USER_DB_STRUCTURE to get name for ID
             if comp_id == company_id:
                 data['Company'] = comp_details['company_name']
                 break
@@ -1450,7 +1450,7 @@ def display_module(module_name, fields_config, collection_name_in_db, crud_enabl
 
 def login_page():
     st.title("Logistic Management System")
-    st.image("https://placehold.co/600x150/EEEEEE/313131?text=Your+Company+Logo", use_container_width=True) # Updated parameter
+    st.image("https://placehold.co/600x150/EEEEEE/313131?text=Your+Company+Logo", use_container_width=True)
     st.markdown("---")
     st.subheader("Login to Your Company Account")
 
@@ -1462,9 +1462,9 @@ def login_page():
         db_users_raw = cursor.fetchall()
     except Exception as e:
         st.error(f"Error fetching users from database: {e}. Please try refreshing the app. This might indicate database initialization issues.")
-        db_users_raw = [] # Ensure it's an empty list to prevent further errors
+        db_users_raw = []
     finally:
-        conn.close() # Ensure connection is closed
+        conn.close()
 
     # Reconstruct a USER_DB-like structure from SQLite for login purposes
     current_user_db_from_sql = {}
@@ -1478,7 +1478,8 @@ def login_page():
         if company_id not in current_user_db_from_sql:
             current_user_db_from_sql[company_id] = {
                 "company_name": company_name,
-                "company_pin": INITIAL_USER_DB_STRUCTURE.get(company_id, {}).get('company_pin', ''), # Get PIN from initial structure
+                # Get PIN from initial structure (or retrieve from DB if stored there)
+                "company_pin": next((INITIAL_USER_DB_STRUCTURE.get(cid, {}).get('company_pin') for cid, cdata in INITIAL_USER_DB_STRUCTURE.items() if cdata['company_name'] == company_name), ''),
                 "users": {}
             }
         current_user_db_from_sql[company_id]['users'][username] = {
@@ -2107,15 +2108,15 @@ def main_app():
                             if cleaned_edited_data != cleaned_original_data:
                                 if update_db_document(selected_company_id_for_modules, 'payslips', row_doc_id, cleaned_edited_data):
                                     updated_payslip_count += 1
-                    
-                    if updated_payslip_count > 0 or deleted_payslip_count > 0 or added_payslip_count > 0:
-                        if updated_payslip_count > 0:
-                            st.success(f"{updated_payslip_count} Payslip entries updated successfully!")
-                        if deleted_payslip_count > 0:
-                            st.success(f"{deleted_payslip_count} Payslip entries deleted successfully!")
-                        if added_payslip_count > 0:
-                            st.success(f"{added_payslip_count} new Payslip entries added successfully!")
-                        st.rerun()
+            
+            if updated_payslip_count > 0 or deleted_payslip_count > 0 or added_payslip_count > 0:
+                if updated_payslip_count > 0:
+                    st.success(f"{updated_payslip_count} Payslip entries updated successfully!")
+                if deleted_payslip_count > 0:
+                    st.success(f"{deleted_payslip_count} Payslip entries deleted successfully!")
+                if added_payslip_count > 0:
+                    st.success(f"{added_payslip_count} new Payslip entries added successfully!")
+                st.rerun()
 
                     st.subheader(f"Download Payslip Reports for {selected_company_name_for_modules}")
                     col1, col2 = st.columns(2)
