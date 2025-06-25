@@ -92,105 +92,8 @@ if 'logged_in' not in st.session_state:
 if 'USER_DB' not in st.session_state:
     st.session_state['USER_DB'] = INITIAL_USER_DB_STRUCTURE.copy()
 
-# --- SQLite Database Initialization and Operations ---
-DB_NAME = 'logistic_erp.db'
-
-def get_db_connection():
-    """Establishes a connection to the SQLite database."""
-    if 'db_conn' not in st.session_state:
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row # Allows accessing columns by name
-        st.session_state['db_conn'] = conn
-    return st.session_state['db_conn']
-
-def init_db():
-    """Initializes the database schema and populates initial user data."""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    # Create users table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            company_id TEXT NOT NULL,
-            company_name TEXT NOT NULL,
-            username TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL
-        )
-    """)
-
-    # Populate initial users if table is empty
-    cursor.execute("SELECT COUNT(*) FROM users")
-    if cursor.fetchone()[0] == 0:
-        for company_id, company_data in INITIAL_USER_DB_STRUCTURE.items():
-            for username, user_data in company_data['users'].items():
-                cursor.execute(
-                    "INSERT INTO users (id, company_id, company_name, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)",
-                    (str(uuid.uuid4()), company_id, company_data['company_name'], username, user_data['password_hash'], user_data['role'])
-                )
-        conn.commit()
-        st.success("Initial users populated in database!")
-
-    # Create tables for each module dynamically based on MODULE_FIELDS_MAP
-    for table_name, fields_config in MODULE_FIELDS_MAP.items():
-        columns = []
-        columns.append("doc_id TEXT PRIMARY KEY") # Unique ID for each record
-        columns.append("company_id TEXT NOT NULL") # Link to company_id from users
-        columns.append("Company TEXT NOT NULL") # Store company name directly for display
-
-        for field_name, config in fields_config.items():
-            # Skip auto-generated IDs and calculated fields if they are explicitly listed in fields_config
-            if field_name in ['Trip ID', 'Rental ID', 'Inv Number', 'SI No', 'Payslip ID', 'Net Salary']:
-                # These will be generated and added dynamically to the 'data' dictionary
-                # and stored in their respective columns, they don't need a default schema definition here.
-                # However, if they are part of the core data, they must have a column.
-                # For this design, let's assume they are stored like other fields.
-                pass # Handled below
-            
-            sql_type = "TEXT"
-            if config['type'] == 'number':
-                sql_type = "REAL"
-            elif config['type'] == 'date':
-                sql_type = "TEXT" # YYYY-MM-DD
-            elif config['type'] == 'datetime':
-                sql_type = "TEXT" # YYYY-MM-DD HH:MM:SS.ffffff
-            elif config['type'] == 'checkbox':
-                sql_type = "INTEGER" # 0 or 1
-            
-            columns.append(f"\"{field_name}\" {sql_type}") # Quote column names to handle spaces
-
-        # Add explicit columns for the auto-generated IDs and Net Salary if they are not naturally in fields_config keys
-        # This prevents "no such column" errors when trying to insert these values.
-        if table_name == 'trips' and 'Trip ID' not in fields_config:
-            columns.append("\"Trip ID\" TEXT")
-        if table_name == 'rentals' and 'Rental ID' not in fields_config:
-            columns.append("\"Rental ID\" TEXT")
-        if table_name == 'invoices' and 'Inv Number' not in fields_config:
-            columns.append("\"Inv Number\" TEXT")
-        if table_name == 'invoices' and 'SI No' not in fields_config:
-            columns.append("\"SI No\" TEXT")
-        if table_name == 'payslips' and 'Payslip ID' not in fields_config:
-            columns.append("\"Payslip ID\" TEXT")
-        if table_name == 'payslips' and 'Net Salary' not in fields_config:
-            columns.append("\"Net Salary\" REAL")
-
-        create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(columns)})"
-        cursor.execute(create_table_sql)
-        conn.commit()
-    st.success("Database tables initialized successfully.")
-
-# Run database initialization once
-if 'db_initialized_flag' not in st.session_state:
-    init_db()
-    st.session_state['db_initialized_flag'] = True
-
-
-# --- Helper to map module names to their field configurations (repeated for clarity/scope) ---
-MODULE_FIELDS_MAP = {}
 
 # --- Specific Module Field Configurations ---
-# (Same as before)
 TRIP_MANAGEMENT_FIELDS = {
     'Trip Type': {'type': 'select', 'options': ['Per Trip', 'Daily', 'Monthly']},
     'Vehicle Type': {'type': 'select', 'options': ['Open', 'Box', 'Chiller', 'Frozen', 'Chiller Van', 'Passenger Van', 'Others']},
@@ -304,7 +207,7 @@ VAT_INPUT_OUTPUT_FIELDS = {
     'Related ID': {'type': 'text'},
 }
 
-# Populate the MODULE_FIELDS_MAP
+# Populate the MODULE_FIELDS_MAP right after defining all individual field configs
 MODULE_FIELDS_MAP = {
     'trips': TRIP_MANAGEMENT_FIELDS,
     'rentals': RENTAL_MANAGEMENT_FIELDS,
@@ -317,6 +220,96 @@ MODULE_FIELDS_MAP = {
     'vat_transactions': VAT_INPUT_OUTPUT_FIELDS
 }
 
+# --- SQLite Database Initialization and Operations ---
+DB_NAME = 'logistic_erp.db'
+
+def get_db_connection():
+    """Establishes a connection to the SQLite database."""
+    if 'db_conn' not in st.session_state:
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row # Allows accessing columns by name
+        st.session_state['db_conn'] = conn
+    return st.session_state['db_conn']
+
+def init_db():
+    """Initializes the database schema and populates initial user data."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    # Create users table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id TEXT PRIMARY KEY,
+            company_id TEXT NOT NULL,
+            company_name TEXT NOT NULL,
+            username TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL
+        )
+    """)
+
+    # Populate initial users if table is empty
+    cursor.execute("SELECT COUNT(*) FROM users")
+    if cursor.fetchone()[0] == 0:
+        for company_id, company_data in INITIAL_USER_DB_STRUCTURE.items():
+            for username, user_data in company_data['users'].items():
+                cursor.execute(
+                    "INSERT INTO users (id, company_id, company_name, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)",
+                    (str(uuid.uuid4()), company_id, company_data['company_name'], username, user_data['password_hash'], user_data['role'])
+                )
+        conn.commit()
+        st.success("Initial users populated in database!")
+
+    # Create tables for each module dynamically based on MODULE_FIELDS_MAP
+    for table_name, fields_config in MODULE_FIELDS_MAP.items():
+        columns = []
+        columns.append("doc_id TEXT PRIMARY KEY") # Unique ID for each record
+        columns.append("company_id TEXT NOT NULL") # Link to company_id from users
+        columns.append("Company TEXT NOT NULL") # Store company name directly for display
+
+        for field_name, config in fields_config.items():
+            sql_type = "TEXT"
+            if config['type'] == 'number':
+                sql_type = "REAL"
+            elif config['type'] == 'date':
+                sql_type = "TEXT" # YYYY-MM-DD
+            elif config['type'] == 'datetime':
+                sql_type = "TEXT" # YYYY-MM-DD HH:MM:SS.ffffff
+            elif config['type'] == 'checkbox':
+                sql_type = "INTEGER" # 0 or 1
+            
+            # Quoting column names to handle spaces and special characters.
+            # SQLite does not allow `TEXT PRIMARY KEY` and `NOT NULL` on a column if it's not the first column.
+            # The doc_id is already the primary key.
+            columns.append(f"\"{field_name}\" {sql_type}") 
+
+        # Add explicit columns for the auto-generated IDs and Net Salary if they are not naturally in fields_config keys
+        # This is crucial for their inclusion in the database schema.
+        # These fields were implicitly included previously, but explicit declaration is safer.
+        if table_name == 'trips' and 'Trip ID' not in fields_config:
+            columns.append("\"Trip ID\" TEXT")
+        if table_name == 'rentals' and 'Rental ID' not in fields_config:
+            columns.append("\"Rental ID\" TEXT")
+        if table_name == 'invoices' and 'Inv Number' not in fields_config:
+            columns.append("\"Inv Number\" TEXT")
+        if table_name == 'invoices' and 'SI No' not in fields_config:
+            columns.append("\"SI No\" TEXT")
+        if table_name == 'payslips' and 'Payslip ID' not in fields_config:
+            columns.append("\"Payslip ID\" TEXT")
+        if table_name == 'payslips' and 'Net Salary' not in fields_config:
+            columns.append("\"Net Salary\" REAL")
+
+        create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(columns)})"
+        cursor.execute(create_table_sql)
+        conn.commit()
+    st.success("Database tables initialized successfully.")
+
+# Run database initialization once
+if 'db_initialized_flag' not in st.session_state:
+    init_db()
+    st.session_state['db_initialized_flag'] = True
+
+
 def get_db_collection(company_id, collection_name):
     """
     Fetches all documents from a SQLite table for a given company.
@@ -326,7 +319,7 @@ def get_db_collection(company_id, collection_name):
     cursor = conn.cursor()
     
     try:
-        cursor.execute(f"SELECT * FROM {collection_name} WHERE company_id = ?", (company_id,))
+        cursor.execute(f"SELECT * FROM \"{collection_name}\" WHERE company_id = ?", (company_id,)) # Quote table name
         rows = cursor.fetchall()
         
         if not rows:
@@ -338,8 +331,10 @@ def get_db_collection(company_id, collection_name):
                 columns_for_empty_df.insert(0, 'Inv Number') 
                 columns_for_empty_df.insert(1, 'SI No') # SI No is also an auto-generated ID for invoices
             if collection_name == 'payslips': columns_for_empty_df.insert(0, 'Payslip ID')
+            if collection_name == 'payslips' and 'Net Salary' not in columns_for_empty_df: columns_for_empty_df.append('Net Salary') # Ensure Net Salary is there
             columns_for_empty_df.append('Company') # Company name will be stored in the table
             columns_for_empty_df.append('doc_id') # Add doc_id as it's the primary key
+            columns_for_empty_df.append('company_id') # Internal link
             return pd.DataFrame(columns=columns_for_empty_df)
 
         # Convert list of sqlite3.Row objects to list of dicts
@@ -355,8 +350,8 @@ def get_db_collection(company_id, collection_name):
                     df[field] = pd.to_datetime(df[field], errors='coerce').dt.date
                 elif config['type'] == 'datetime':
                     df[field] = pd.to_datetime(df[field], errors='coerce')
-                elif config['type'] == 'checkbox':
-                    df[field] = df[field].astype(bool) # Convert 0/1 to boolean
+            elif field in df.columns and config['type'] == 'checkbox':
+                df[field] = df[field].astype(bool) # Convert 0/1 to boolean
 
         # Ensure all expected columns are present, even if empty
         expected_cols = list(module_fields_config.keys())
@@ -437,7 +432,7 @@ def add_db_document(company_id, collection_name, data):
     values = tuple(processed_data.values())
 
     try:
-        cursor.execute(f"INSERT INTO {collection_name} ({columns}) VALUES ({placeholders})", values)
+        cursor.execute(f"INSERT INTO \"{collection_name}\" ({columns}) VALUES ({placeholders})", values) # Quote table name
         conn.commit()
         st.rerun() # Trigger rerun to refresh UI
         return new_doc_id
@@ -472,7 +467,7 @@ def update_db_document(company_id, collection_name, doc_id, data):
     values = tuple(processed_update_data.values()) + (doc_id, company_id)
 
     try:
-        cursor.execute(f"UPDATE {collection_name} SET {', '.join(set_clauses)} WHERE doc_id = ? AND company_id = ?", values)
+        cursor.execute(f"UPDATE \"{collection_name}\" SET {', '.join(set_clauses)} WHERE doc_id = ? AND company_id = ?", values) # Quote table name
         conn.commit()
         st.rerun() # Trigger rerun to refresh UI
         return True
@@ -487,7 +482,7 @@ def delete_db_document(company_id, collection_name, doc_id):
     cursor = conn.cursor()
     
     try:
-        cursor.execute(f"DELETE FROM {collection_name} WHERE doc_id = ? AND company_id = ?", (doc_id, company_id))
+        cursor.execute(f"DELETE FROM \"{collection_name}\" WHERE doc_id = ? AND company_id = ?", (doc_id, company_id)) # Quote table name
         conn.commit()
         st.rerun() # Trigger rerun to refresh UI
         return True
@@ -680,6 +675,7 @@ def generate_management_pdf_report(all_companies_data, user_db_current):
     total_payslips_net_salary_all = 0.0
     total_leaves_all = 0
     total_vat_amount_all = 0.0
+
 
     # Data for charts (summaries for PDF)
     vehicles_by_type_data = {}
