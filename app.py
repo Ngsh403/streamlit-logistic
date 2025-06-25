@@ -113,9 +113,17 @@ FIREBASE_SERVICE_ACCOUNT_KEY_JSON = {
   "universe_domain": "googleapis.com"
 }
 
-# Correct the private key string by replacing escaped newlines with actual newlines
-FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key'] = FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key'].replace('\\n', '\n')
+# IMPORTANT FIX: Ensure private_key is correctly formatted with actual newlines
+# and remove any non-standard "----------" lines that might be present from copy-pasting.
+cleaned_private_key_lines = []
+# First, convert escaped newlines
+temp_private_key = FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key'].replace('\\n', '\n')
 
+# Then, split by lines and filter out any "----------" lines
+for line in temp_private_key.splitlines():
+    if line.strip() != '----------':
+        cleaned_private_key_lines.append(line)
+FIREBASE_SERVICE_ACCOUNT_KEY_JSON['private_key'] = '\n'.join(cleaned_private_key_lines)
 
 FIREBASE_PROJECT_ID = FIREBASE_SERVICE_ACCOUNT_KEY_JSON['project_id']
 FIRESTORE_ROOT_COLLECTION = "logistic_app_data" # User specified this
@@ -225,6 +233,7 @@ EMPLOYEE_MANAGEMENT_FIELDS = {
     'Visa Exp': {'type': 'date'},
     'Nationality': {'type': 'text'},
     'Assigned Vehicle History': {'type': 'text'},
+    'Availability Status': {'type': 'select', 'options': ['On leave', 'Active']},
     'ID/Passport/DL Uploads': {'type': 'file'},
 }
 
@@ -803,7 +812,6 @@ def generate_single_tax_invoice_pdf(invoice_data, company_details, logo_url, log
     pdf.set_font("Arial", "", 9)
     pdf.set_text_color(50, 50, 50)
     
-    # Ensure consistent 4-space indentation for the following lines
     pdf.set_x(10)
     pdf.cell(0, 5, company_details.get("name", "YOUR COMPANY NAME W.L.L"), 0, 1, "L")
     pdf.set_x(10)
