@@ -644,10 +644,9 @@ def generate_single_tax_invoice_pdf(invoice_data, company_name_actual, company_p
 
     pdf.set_font("Arial", "", 10)
     pdf.cell(0, 7, "Notes:", 0, 1, "L")
-        pdf.multi_cell(0, 5, invoice_data.get('Notes', 'Thank you for your business!'), 0, "L")
+    pdf.multi_cell(0, 5, invoice_data.get('Notes', 'Thank you for your business!'), 0, "L")
     pdf.ln(10)
 
-    # --- Bank Details ---
     pdf.set_font("Arial", "B", 10)
     pdf.cell(0, 7, "Bank Details:", 0, 1, "L")
     pdf.set_font("Arial", "", 9)
@@ -658,14 +657,12 @@ def generate_single_tax_invoice_pdf(invoice_data, company_name_actual, company_p
     pdf.cell(0, 5, "SWIFT/BIC: ABCDEFGH", 0, 1, "L")
     pdf.ln(15)
 
-    # --- Signature Line ---
     pdf.set_x(pdf.w - pdf.r_margin - 60)
     pdf.cell(60, 5, "_________________________", 0, 1, "C")
     pdf.set_x(pdf.w - pdf.r_margin - 60)
     pdf.cell(60, 5, "Authorized Signature", 0, 1, "C")
     pdf.ln(10)
 
-    # --- Footer ---
     pdf.set_y(pdf.h - 15)
     pdf.set_font("Arial", "I", 8)
     pdf.cell(0, 10, f"Page {pdf.page_no()}/{{nb}}", 0, 0, "C")
