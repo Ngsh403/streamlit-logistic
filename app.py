@@ -88,9 +88,9 @@ if 'logged_in' not in st.session_state:
     st.session_state['role'] = None
     st.session_state['admin_selected_company_for_modules_name'] = None
 
-# Initialize USER_DB in session state to prevent KeyError
+# Initialize USER_DB in session state (this will be populated from SQLite)
 if 'USER_DB' not in st.session_state:
-    st.session_state['USER_DB'] = INITIAL_USER_DB_STRUCTURE.copy()
+    st.session_state['USER_DB'] = {}
 
 
 # --- Specific Module Field Configurations ---
@@ -224,90 +224,89 @@ MODULE_FIELDS_MAP = {
 DB_NAME = 'logistic_erp.db'
 
 def get_db_connection():
-    """Establishes a connection to the SQLite database."""
-    if 'db_conn' not in st.session_state:
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row # Allows accessing columns by name
-        st.session_state['db_conn'] = conn
-    return st.session_state['db_conn']
+    """Establishes and returns a new connection to the SQLite database."""
+    # Important: Create a new connection each time to avoid thread issues with Streamlit
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row # Allows accessing columns by name
+    return conn
 
 def init_db():
     """Initializes the database schema and populates initial user data."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Create users table
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id TEXT PRIMARY KEY,
-            company_id TEXT NOT NULL,
-            company_name TEXT NOT NULL,
-            username TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL
-        )
-    """)
+    try:
+        # Create users table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id TEXT PRIMARY KEY,
+                company_id TEXT NOT NULL,
+                company_name TEXT NOT NULL,
+                username TEXT NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL
+            )
+        """)
 
-    # Populate initial users if table is empty
-    cursor.execute("SELECT COUNT(*) FROM users")
-    if cursor.fetchone()[0] == 0:
-        for company_id, company_data in INITIAL_USER_DB_STRUCTURE.items():
-            for username, user_data in company_data['users'].items():
-                cursor.execute(
-                    "INSERT INTO users (id, company_id, company_name, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)",
-                    (str(uuid.uuid4()), company_id, company_data['company_name'], username, user_data['password_hash'], user_data['role'])
-                )
-        conn.commit()
-        st.success("Initial users populated in database!")
+        # Populate initial users if table is empty
+        cursor.execute("SELECT COUNT(*) FROM users")
+        if cursor.fetchone()[0] == 0:
+            for company_id, company_data in INITIAL_USER_DB_STRUCTURE.items():
+                for username, user_data in company_data['users'].items():
+                    cursor.execute(
+                        "INSERT INTO users (id, company_id, company_name, username, password_hash, role) VALUES (?, ?, ?, ?, ?, ?)",
+                        (str(uuid.uuid4()), company_id, company_data['company_name'], username, user_data['password_hash'], user_data['role'])
+                    )
+            conn.commit()
+            st.success("Initial users populated in database!")
 
-    # Create tables for each module dynamically based on MODULE_FIELDS_MAP
-    for table_name, fields_config in MODULE_FIELDS_MAP.items():
-        columns = []
-        columns.append("doc_id TEXT PRIMARY KEY") # Unique ID for each record
-        columns.append("company_id TEXT NOT NULL") # Link to company_id from users
-        columns.append("Company TEXT NOT NULL") # Store company name directly for display
+        # Create tables for each module dynamically based on MODULE_FIELDS_MAP
+        for table_name, fields_config in MODULE_FIELDS_MAP.items():
+            columns = []
+            columns.append("doc_id TEXT PRIMARY KEY") # Unique ID for each record
+            columns.append("company_id TEXT NOT NULL") # Link to company_id from users
+            columns.append("Company TEXT NOT NULL") # Store company name directly for display
 
-        for field_name, config in fields_config.items():
-            sql_type = "TEXT"
-            if config['type'] == 'number':
-                sql_type = "REAL"
-            elif config['type'] == 'date':
-                sql_type = "TEXT" # YYYY-MM-DD
-            elif config['type'] == 'datetime':
-                sql_type = "TEXT" # YYYY-MM-DD HH:MM:SS.ffffff
-            elif config['type'] == 'checkbox':
-                sql_type = "INTEGER" # 0 or 1
-            
-            # Quoting column names to handle spaces and special characters.
-            # SQLite does not allow `TEXT PRIMARY KEY` and `NOT NULL` on a column if it's not the first column.
-            # The doc_id is already the primary key.
-            columns.append(f"\"{field_name}\" {sql_type}") 
+            for field_name, config in fields_config.items():
+                sql_type = "TEXT"
+                if config['type'] == 'number':
+                    sql_type = "REAL"
+                elif config['type'] == 'date':
+                    sql_type = "TEXT" # YYYY-MM-DD
+                elif config['type'] == 'datetime':
+                    sql_type = "TEXT" # YYYY-MM-DD HH:MM:SS.ffffff
+                elif config['type'] == 'checkbox':
+                    sql_type = "INTEGER" # 0 or 1
+                
+                # Quoting column names to handle spaces and special characters.
+                columns.append(f"\"{field_name}\" {sql_type}") 
 
-        # Add explicit columns for the auto-generated IDs and Net Salary if they are not naturally in fields_config keys
-        # This is crucial for their inclusion in the database schema.
-        # These fields were implicitly included previously, but explicit declaration is safer.
-        if table_name == 'trips' and 'Trip ID' not in fields_config:
-            columns.append("\"Trip ID\" TEXT")
-        if table_name == 'rentals' and 'Rental ID' not in fields_config:
-            columns.append("\"Rental ID\" TEXT")
-        if table_name == 'invoices' and 'Inv Number' not in fields_config:
-            columns.append("\"Inv Number\" TEXT")
-        if table_name == 'invoices' and 'SI No' not in fields_config:
-            columns.append("\"SI No\" TEXT")
-        if table_name == 'payslips' and 'Payslip ID' not in fields_config:
-            columns.append("\"Payslip ID\" TEXT")
-        if table_name == 'payslips' and 'Net Salary' not in fields_config:
-            columns.append("\"Net Salary\" REAL")
+            # Add explicit columns for the auto-generated IDs and Net Salary if they are not naturally in fields_config keys
+            if table_name == 'trips' and 'Trip ID' not in fields_config:
+                columns.append("\"Trip ID\" TEXT")
+            if table_name == 'rentals' and 'Rental ID' not in fields_config:
+                columns.append("\"Rental ID\" TEXT")
+            if table_name == 'invoices' and 'Inv Number' not in fields_config:
+                columns.append("\"Inv Number\" TEXT")
+            if table_name == 'invoices' and 'SI No' not in fields_config:
+                columns.append("\"SI No\" TEXT")
+            if table_name == 'payslips' and 'Payslip ID' not in fields_config:
+                columns.append("\"Payslip ID\" TEXT")
+            if table_name == 'payslips' and 'Net Salary' not in fields_config:
+                columns.append("\"Net Salary\" REAL")
 
-        create_table_sql = f"CREATE TABLE IF NOT EXISTS {table_name} ({', '.join(columns)})"
-        cursor.execute(create_table_sql)
-        conn.commit()
-    st.success("Database tables initialized successfully.")
+            create_table_sql = f"CREATE TABLE IF NOT EXISTS \"{table_name}\" ({', '.join(columns)})"
+            cursor.execute(create_table_sql)
+            conn.commit()
+        # st.success("Database tables initialized successfully.") # Commented to reduce clutter on every rerun
+    except Exception as e:
+        st.error(f"Error initializing database: {e}")
+    finally:
+        conn.close()
 
-# Run database initialization once
-if 'db_initialized_flag' not in st.session_state:
-    init_db()
-    st.session_state['db_initialized_flag'] = True
+# Run database initialization on every script rerun.
+# 'CREATE TABLE IF NOT EXISTS' ensures idempotency.
+init_db()
 
 
 def get_db_collection(company_id, collection_name):
@@ -377,7 +376,7 @@ def get_db_collection(company_id, collection_name):
         
         return df
     except sqlite3.OperationalError as e:
-        st.warning(f"Table '{collection_name}' might not exist yet. Please add data to create it. Error: {e}")
+        # st.warning(f"Table '{collection_name}' might not exist yet. Please add data to create it. Error: {e}") # Commented to reduce clutter
         # Return an empty DataFrame with expected columns if table does not exist
         columns_for_empty_df = list(MODULE_FIELDS_MAP.get(collection_name, {}).keys())
         if collection_name == 'trips': columns_for_empty_df.insert(0, 'Trip ID')
@@ -394,6 +393,8 @@ def get_db_collection(company_id, collection_name):
     except Exception as e:
         st.error(f"Error fetching data from SQLite for {collection_name}: {e}")
         return pd.DataFrame()
+    finally:
+        conn.close()
 
 
 def add_db_document(company_id, collection_name, data):
@@ -434,11 +435,12 @@ def add_db_document(company_id, collection_name, data):
     try:
         cursor.execute(f"INSERT INTO \"{collection_name}\" ({columns}) VALUES ({placeholders})", values) # Quote table name
         conn.commit()
-        st.rerun() # Trigger rerun to refresh UI
         return new_doc_id
     except Exception as e:
         st.error(f"Error adding document to SQLite table '{collection_name}': {e}")
         return None
+    finally:
+        conn.close()
 
 
 def update_db_document(company_id, collection_name, doc_id, data):
@@ -469,11 +471,12 @@ def update_db_document(company_id, collection_name, doc_id, data):
     try:
         cursor.execute(f"UPDATE \"{collection_name}\" SET {', '.join(set_clauses)} WHERE doc_id = ? AND company_id = ?", values) # Quote table name
         conn.commit()
-        st.rerun() # Trigger rerun to refresh UI
         return True
     except Exception as e:
         st.error(f"Error updating document {doc_id} in SQLite table '{collection_name}': {e}")
         return False
+    finally:
+        conn.close()
 
 
 def delete_db_document(company_id, collection_name, doc_id):
@@ -484,11 +487,12 @@ def delete_db_document(company_id, collection_name, doc_id):
     try:
         cursor.execute(f"DELETE FROM \"{collection_name}\" WHERE doc_id = ? AND company_id = ?", (doc_id, company_id)) # Quote table name
         conn.commit()
-        st.rerun() # Trigger rerun to refresh UI
         return True
     except Exception as e:
         st.error(f"Error deleting document {doc_id} from SQLite table '{collection_name}': {e}")
         return False
+    finally:
+        conn.close()
 
 # --- Helper Functions for Reports ---
 def generate_excel_report(df, filename):
@@ -1453,8 +1457,14 @@ def login_page():
     # Fetch users from SQLite
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT company_id, company_name, username, password_hash, role FROM users")
-    db_users_raw = cursor.fetchall()
+    try:
+        cursor.execute("SELECT company_id, company_name, username, password_hash, role FROM users")
+        db_users_raw = cursor.fetchall()
+    except Exception as e:
+        st.error(f"Error fetching users from database: {e}. Please try refreshing the app. This might indicate database initialization issues.")
+        db_users_raw = [] # Ensure it's an empty list to prevent further errors
+    finally:
+        conn.close() # Ensure connection is closed
 
     # Reconstruct a USER_DB-like structure from SQLite for login purposes
     current_user_db_from_sql = {}
@@ -1481,13 +1491,16 @@ def login_page():
     with st.form(key="main_login_form"):
         # Ensure company_names are from the dynamically loaded users, not just initial structure
         company_names = sorted(list(set([details['company_name'] for details in st.session_state['USER_DB'].values()])))
-        selected_company_name = st.selectbox("Select Your Company", options=company_names, key="login_company_select")
+        
+        # Add a default empty option for the selectbox
+        selected_company_name = st.selectbox("Select Your Company", options=['--- Select Company ---'] + company_names, key="login_company_select")
 
         selected_company_id = None
-        for comp_id, comp_details in st.session_state['USER_DB'].items():
-            if comp_details['company_name'] == selected_company_name:
-                selected_company_id = comp_id
-                break
+        if selected_company_name != '--- Select Company ---':
+            for comp_id, comp_details in st.session_state['USER_DB'].items():
+                if comp_details['company_name'] == selected_company_name:
+                    selected_company_id = comp_id
+                    break
 
         username = st.text_input("Username", key="login_username", placeholder="Enter your username")
         password = st.text_input("Password", type="password", key="login_password", placeholder="Enter your password")
@@ -1496,21 +1509,24 @@ def login_page():
 
         if login_button:
             if selected_company_id and username and password:
-                users_in_company = st.session_state['USER_DB'][selected_company_id]['users']
-                if username in users_in_company:
-                    stored_password_hash = users_in_company[username]['password_hash']
-                    if bcrypt.checkpw(password.encode('utf-8'), stored_password_hash.encode('utf-8')):
-                        st.session_state['logged_in'] = True
-                        st.session_state['company_id'] = selected_company_id
-                        st.session_state['user_id'] = username
-                        st.session_state['company_name'] = selected_company_name
-                        st.session_state['role'] = users_in_company[username]['role']
-                        st.success(f"Logged in as {username} for {st.session_state['company_name']}!")
-                        st.rerun()
+                if selected_company_id in st.session_state['USER_DB']:
+                    users_in_company = st.session_state['USER_DB'][selected_company_id]['users']
+                    if username in users_in_company:
+                        stored_password_hash = users_in_company[username]['password_hash']
+                        if bcrypt.checkpw(password.encode('utf-8'), stored_password_hash.encode('utf-8')):
+                            st.session_state['logged_in'] = True
+                            st.session_state['company_id'] = selected_company_id
+                            st.session_state['user_id'] = username
+                            st.session_state['company_name'] = selected_company_name
+                            st.session_state['role'] = users_in_company[username]['role']
+                            st.success(f"Logged in as {username} for {st.session_state['company_name']}!")
+                            st.rerun()
+                        else:
+                            st.error("Invalid Username or Password.")
                     else:
                         st.error("Invalid Username or Password.")
                 else:
-                    st.error("Invalid Username or Password.")
+                    st.error("Company not found in database. This should not happen if initialization was successful.")
             else:
                 st.error("Please select a company and enter username/password.")
 
@@ -1628,7 +1644,7 @@ def main_app():
 
             st.markdown("---")
             st.info("This section displays aggregated data, charts, and summaries from all companies.")
-            st.warning("Note: All data is stored in a SQLite database file and might be lost on ephemeral deployments.")
+            st.warning("Note: All data is persisted in a SQLite database file.")
 
         elif menu_selection == "Analysis Dashboard":
             st.subheader("Cross-Company Analytical Insights")
@@ -1783,7 +1799,7 @@ def main_app():
 
             st.markdown("---")
             st.info("These charts provide a visual summary of your companies' performance.")
-            st.warning("Note: All data is stored in a SQLite database file and might be lost on ephemeral deployments.")
+            st.warning("Note: All data is persisted in a SQLite database file.")
 
 
         elif menu_selection == "Cross-Company Reports":
@@ -2063,7 +2079,7 @@ def main_app():
 
                         if pd.isna(row_doc_id) or row_doc_id is None:
                             for field_name, field_cfg in PAYROLL_FIELDS.items():
-                                if field_name in ['Payslip ID', 'Net Salary']: # Skip calculated and ID fields
+                                if field_name in ['Payslip ID', 'Net Salary']:
                                     continue
                                 if field_name not in cleaned_edited_data or cleaned_edited_data[field_name] is None:
                                     if field_cfg['type'] == 'text':
@@ -2177,7 +2193,7 @@ def main_app():
             st.subheader("Welcome to Your Company's Dashboard!")
             st.info("This section will provide key performance indicators and summaries specific to your company.")
             st.write("E.g., Number of Ongoing Trips, Recent Rentals, Fleet Availability, Revenue this month.")
-            st.warning("Note: All data is stored in a SQLite database file and might be lost on ephemeral deployments.")
+            st.warning("Note: All data is persisted in a SQLite database file.")
 
 
         elif selected_module == "Trip Management":
