@@ -8,7 +8,9 @@ import plotly.express as px
 import plotly.graph_objects as go
 import json # Import json for parsing the firebase config string
 from num2words import num2words # Import for converting numbers to words for invoice amounts
-
+# Set Streamlit page config as the first Streamlit command
+import streamlit as st
+st.set_page_config(layout="wide", page_title="Logistic Management System")
 # --- Firebase Admin SDK Imports ---
 import firebase_admin
 from firebase_admin import credentials
@@ -1706,6 +1708,13 @@ def main():
                             )
                 else:
                     st.info("No data available to generate a report.")
+                if firebase_initialized:
+                    st.info("Firebase app initialized successfully.")
+               else:
+                    st.error("Firebase initialization failed. Database operations may not work.")
+
+if __name__ == "__main__":
+    main()
 
 if __name__ == "__main__":
     main()
