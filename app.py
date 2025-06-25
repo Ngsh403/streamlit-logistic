@@ -594,7 +594,7 @@ def generate_single_tax_invoice_pdf(invoice_data, company_name_actual, company_p
     pdf.set_text_color(50, 50, 50) # Darker gray for header text
     
     # # Example header content (replace with actual data for your company if not in background image)
-     pdf.set_x(1) # Align with left margin
+    # Align with left margin
      pdf.cell(0, 5, "EAST CONCORD W.L.L", 0, 1, "L")
      pdf.set_x(50)
      pdf.cell(0, 5, "Flat/Shop No. 11, Building 471", 0, 1, "L")
