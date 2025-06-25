@@ -19,22 +19,22 @@ INITIAL_USER_DB_STRUCTURE = {
         "company_name": "EAST CONCORD W.L.L",
         "company_pin": "EAST", # Simplified PIN for login
         "users": {
-            "john_east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
-            "jane_east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "east": {"password_hash": bcrypt.hashpw("east123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
         }
     },
     "sa_concord_international": {
         "company_name": "S.A. CONCORD INTERNATIONAL CARGO HANDLING CO W.L.L",
         "company_pin": "SA",
         "users": {
-            "peter_sa": {"password_hash": bcrypt.hashpw("sa123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "sa": {"password_hash": bcrypt.hashpw("sa123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
         }
     },
     "north_concord_cargo": {
         "company_name": "NORTH CONCORD CARGO HANDLING CO W.L.L",
         "company_pin": "NORTH",
         "users": {
-            "alice_north": {"password_hash": bcrypt.hashpw("north123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
+            "north": {"password_hash": bcrypt.hashpw("north123".encode('utf-8'), bcrypt.gensalt()).decode('utf-8'), "role": "user"},
         }
     },
     "management_company": {
@@ -1176,13 +1176,23 @@ def display_module(module_name, fields_config, collection_name_in_db, crud_enabl
                 if config['type'] == 'text':
                     new_entry_data_input[field] = st.text_input(field, value=current_value, placeholder=f"Enter {field}", key=widget_key)
                 elif config['type'] == 'number':
-                    new_entry_data_input[field] = st.number_input(field, value=float(current_value), key=widget_key) # Ensure float for number_input
+                    # Ensure value is float, default to 0.0 if None
+                    new_entry_data_input[field] = st.number_input(field, value=float(current_value if current_value is not None else 0.0), key=widget_key)
                 elif config['type'] == 'date':
-                    new_entry_data_input[field] = st.date_input(field, value=current_value, key=widget_key)
+                    # Ensure value is datetime.date, default to today if None
+                    new_entry_data_input[field] = st.date_input(field, value=current_value if current_value is not None else datetime.date.today(), key=widget_key)
                 elif config['type'] == 'datetime':
                     # Split datetime into date and time inputs for granular control
-                    date_val_add = st.date_input(f"{field} Date", value=current_value.date() if isinstance(current_value, datetime.datetime) else datetime.date.today(), key=f"{widget_key}_date")
-                    time_val_add = st.time_input(f"{field} Time", value=current_value.time() if isinstance(current_value, datetime.datetime) else datetime.time(8,0), key=f"{widget_key}_time")
+                    date_val_add = st.date_input(
+                        f"{field} Date", 
+                        value=current_value.date() if isinstance(current_value, datetime.datetime) else datetime.date.today(), 
+                        key=f"{widget_key}_date"
+                    )
+                    time_val_add = st.time_input(
+                        f"{field} Time", 
+                        value=current_value.time() if isinstance(current_value, datetime.datetime) else datetime.time(8,0), 
+                        key=f"{widget_key}_time"
+                    )
                     
                     if date_val_add and time_val_add:
                         new_entry_data_input[field] = datetime.datetime.combine(date_val_add, time_val_add)
@@ -2118,7 +2128,6 @@ def main_app():
                             st.success(f"{added_payslip_count} new Payslip entries added successfully!")
                         st.rerun()
 
-                    # Corrected indentation for the download section
                     st.subheader(f"Download Payslip Reports for {selected_company_name_for_modules}")
                     col1, col2 = st.columns(2)
                     with col1:
@@ -2373,7 +2382,6 @@ def main_app():
                     st.success(f"{added_payslip_count} new Payslip entries added successfully!")
                 st.rerun()
 
-            # Corrected indentation for the download section
             st.subheader("Download Payslip Reports")
             col1, col2 = st.columns(2)
             with col1:
