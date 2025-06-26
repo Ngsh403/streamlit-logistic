@@ -7,5 +7,4 @@ xlsxwriter==3.2.5
 num2words>=0.5.11
 plotly>=5.0.0
 firebase-admin==6.5.0
-plotly==5.22.0
 num2words==0.5.13
