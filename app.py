@@ -1562,7 +1562,7 @@ def display_module(module_name, fields_config, collection_name_in_db, crud_enabl
 
 def login_page():
     st.title("Logistic Management System")
-    st.image("https://placehold.co/600x150/EEEEEE/313131?text=Your+Company+Logo", use_column_width=True) # Corrected keyword argument here
+    # st.image("https://placehold.co/600x150/EEEEEE/313131?text=Your+Company+Logo", use_column_width=True) # Corrected keyword argument here
     st.markdown("---")
     st.subheader("Login to Your Company Account")
 
