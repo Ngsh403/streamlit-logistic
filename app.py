@@ -1494,63 +1494,65 @@ def display_module(module_name, fields_config, collection_name_in_db, crud_enabl
 
             invoice_options = filtered_df_for_crud['Inv Number'].dropna().tolist() # Ensure no NaNs in options
             if invoice_options:
-                selected_invoice_number = st.selectbox(
-                    "Select an Invoice to Generate PDF:",
-                    ['--- Select Invoice ---'] + invoice_options,
-                    key=f"{actual_company_id_for_filter}_select_invoice_for_pdf"
-                )
+                st.info("Invoice PDF generation is removed as requested.")
+                # selected_invoice_number = st.selectbox(
+                #     "Select an Invoice to Generate PDF:",
+                #     ['--- Select Invoice ---'] + invoice_options,
+                #     key=f"{actual_company_id_for_filter}_select_invoice_for_pdf"
+                # )
 
-                if selected_invoice_number and selected_invoice_number != '--- Select Invoice ---':
-                    selected_invoice_data = filtered_df_for_crud[filtered_df_for_crud['Inv Number'] == selected_invoice_number].iloc[0].to_dict()
-                    company_profile_for_invoice = COMPANY_PROFILES.get(actual_company_name_for_filter)
+                # if selected_invoice_number and selected_invoice_number != '--- Select Invoice ---':
+                #     selected_invoice_data = filtered_df_for_crud[filtered_df_for_crud['Inv Number'] == selected_invoice_number].iloc[0].to_dict()
+                #     company_profile_for_invoice = COMPANY_PROFILES.get(actual_company_name_for_filter)
 
-                    if company_profile_for_invoice:
-                        if st.button(f"Download Tax Invoice PDF for {selected_invoice_number}", key=f"{actual_company_id_for_filter}_{selected_invoice_number}_invoice_pdf_download"):
-                            tax_invoice_pdf_data = generate_single_tax_invoice_pdf(
-                                selected_invoice_data,
-                                company_profile_for_invoice,
-                                logo_url=logo_url_input,
-                                logo_x=logo_x_pos,
-                                logo_y=logo_y_pos,
-                                logo_width=logo_width_fixed,
-                                logo_height=logo_height_fixed
-                            )
-                            st.download_button(
-                                label=f"Download Invoice {selected_invoice_number} PDF",
-                                data=tax_invoice_pdf_data,
-                                file_name=f"Tax_Invoice_{selected_invoice_number}.pdf",
-                                mime="application/pdf",
-                                key=f"{actual_company_id_for_filter}_{selected_invoice_number}_pdf_download_final"
-                            )
-                            st.success(f"Tax Invoice PDF for {selected_invoice_number} generated successfully!")
-                    else:
-                        st.error(f"Company profile for '{actual_company_name_for_filter}' not found for invoice generation. Please ensure company profile is defined in COMPANY_PROFILES.")
-                else:
-                    st.info("Please select an invoice to generate its PDF.")
+                #     if company_profile_for_invoice:
+                #         if st.button(f"Download Tax Invoice PDF for {selected_invoice_number}", key=f"{actual_company_id_for_filter}_{selected_invoice_number}_invoice_pdf_download"):
+                #             tax_invoice_pdf_data = generate_single_tax_invoice_pdf(
+                #                 selected_invoice_data,
+                #                 company_profile_for_invoice,
+                #                 logo_url=logo_url_input,
+                #                 logo_x=logo_x_pos,
+                #                 logo_y=logo_y_pos,
+                #                 logo_width=logo_width_fixed,
+                #                 logo_height=logo_height_fixed
+                #             )
+                #             st.download_button(
+                #                 label=f"Download Invoice {selected_invoice_number} PDF",
+                #                 data=tax_invoice_pdf_data,
+                #                 file_name=f"Tax_Invoice_{selected_invoice_number}.pdf",
+                #                 mime="application/pdf",
+                #                 key=f"{actual_company_id_for_filter}_{selected_invoice_number}_pdf_download_final"
+                #             )
+                #             st.success(f"Tax Invoice PDF for {selected_invoice_number} generated successfully!")
+                #     else:
+                #         st.error(f"Company profile for '{actual_company_name_for_filter}' not found for invoice generation. Please ensure company profile is defined in COMPANY_PROFILES.")
+                # else:
+                #     st.info("Please select an invoice to generate its PDF.")
             else:
                 st.info("No invoices available for PDF generation. Please add invoice entries first.")
         # --- End of New Invoice PDF Generation ---
 
         st.subheader(f"Download {module_name} Reports for {actual_company_name_for_filter}")
-        col1, col2 = st.columns(2)
-        with col1:
-            excel_data = generate_excel_report(current_company_data.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{module_name}_Report_{actual_company_name_for_filter}")
-            st.download_button(
-                label=f"Download {module_name} Excel ({actual_company_name_for_filter})",
-                data=excel_data,
-                file_name=f"{module_name}_Report_{actual_company_name_for_filter}_{datetime.date.today()}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                key=f"{actual_company_id_for_filter}_{module_name}_excel_download"
-            )
-        with col2:
-            pdf_data = generate_pdf_report(current_company_data.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{module_name} Report for {actual_company_name_for_filter}")
-            st.download_button(
-                label=f"Download {module_name} PDF ({actual_company_name_for_filter})",
-                data=pdf_data,
-                file_name=f"Report_{module_name}_Report_{actual_company_name_for_filter}_{datetime.date.today()}.pdf",
-                mime="application/pdf",
-                key=f"{actual_company_id_for_filter}_{module_name}_pdf_download"
-            )
+        # col1, col2 = st.columns(2) # Removed col2 as PDF is removed
+        
+        # with col1:
+        excel_data = generate_excel_report(current_company_data.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{module_name}_Report_{actual_company_name_for_filter}")
+        st.download_button(
+            label=f"Download {module_name} Excel ({actual_company_name_for_filter})",
+            data=excel_data,
+            file_name=f"{module_name}_Report_{actual_company_name_for_filter}_{datetime.date.today()}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key=f"{actual_company_id_for_filter}_{module_name}_excel_download"
+        )
+        # with col2: # Removed PDF download button
+        #     pdf_data = generate_pdf_report(current_company_data.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{module_name} Report for {actual_company_name_for_filter}")
+        #     st.download_button(
+        #         label=f"Download {module_name} PDF ({actual_company_name_for_filter})",
+        #         data=pdf_data,
+        #         file_name=f"Report_{module_name}_Report_{actual_company_name_for_filter}_{datetime.date.today()}.pdf",
+        #         mime="application/pdf",
+        #         key=f"{actual_company_id_for_filter}_{module_name}_pdf_download"
+        #     )
 
         st.markdown("---")
         st.info(f"Note: Data for {module_name} is persisted in SQLite database. Data might be lost on ephemeral deployments.")
@@ -1560,7 +1562,7 @@ def display_module(module_name, fields_config, collection_name_in_db, crud_enabl
 
 def login_page():
     st.title("Logistic Management System")
-    st.image("https://placehold.co/600x150/EEEEEE/313131?text=Your+Company+Logo", use_container_width=True)
+    st.image("https://placehold.co/600x150/EEEEEE/313131?text=Your+Company+Logo", use_column_width=True) # Corrected keyword argument here
     st.markdown("---")
     st.subheader("Login to Your Company Account")
 
@@ -1929,23 +1931,23 @@ def main_app():
 
             if not all_operational_data_concat.empty:
                 st.dataframe(add_serial_numbers(all_operational_data_concat.drop(columns=['doc_id', 'company_id'], errors='ignore')), use_container_width=True, hide_index=True)
-                col_ex_overall, col_pdf_overall = st.columns(2)
-                with col_ex_overall:
-                    st.download_button(
-                        label="Download All Companies Consolidated Excel",
-                        data=generate_excel_report(all_operational_data_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All_Companies_Consolidated_Report"),
-                        file_name=f"All_Companies_Consolidated_Report_{datetime.date.today()}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="all_companies_consolidated_excel_download"
-                    )
-                with col_pdf_overall:
-                    st.download_button(
-                        label="Download All Companies Consolidated PDF",
-                        data=generate_pdf_report(all_operational_data_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All Companies Consolidated Report"),
-                        file_name=f"All_Companies_Consolidated_Report_{datetime.date.today()}.pdf",
-                        mime="application/pdf",
-                        key="all_companies_consolidated_pdf_download"
-                    )
+                # col_ex_overall, col_pdf_overall = st.columns(2) # Removed col2 for PDF
+                # with col_ex_overall:
+                st.download_button(
+                    label="Download All Companies Consolidated Excel",
+                    data=generate_excel_report(all_operational_data_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All_Companies_Consolidated_Report"),
+                    file_name=f"All_Companies_Consolidated_Report_{datetime.date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="all_companies_consolidated_excel_download"
+                )
+                # with col_pdf_overall: # Removed PDF download button
+                #     st.download_button(
+                #         label="Download All Companies Consolidated PDF",
+                #         data=generate_pdf_report(all_operational_data_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All Companies Consolidated Report"),
+                #         file_name=f"All_Companies_Consolidated_Report_{datetime.date.today()}.pdf",
+                #         mime="application/pdf",
+                #         key="all_companies_consolidated_pdf_download"
+                #     )
             else:
                 st.info("No operational data available across all companies yet. Please add data using individual company logins.")
 
@@ -1955,38 +1957,39 @@ def main_app():
             if not all_trips_df.empty:
                 st.markdown("#### All Trips Overview (All Companies)")
                 st.dataframe(add_serial_numbers(all_trips_df.drop(columns=['doc_id', 'company_id'], errors='ignore')), use_container_width=True, hide_index=True)
-                col_ex, col_pdf = st.columns(2)
-                with col_ex:
-                    st.download_button(
-                        label="Download All Trips Excel",
-                        data=generate_excel_report(all_trips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All_Trips_Report"),
-                        file_name=f"All_Trips_Report_{datetime.date.today()}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key="all_trips_excel_download"
-                    )
-                with col_pdf:
-                    st.download_button(
-                        label="Download All Trips PDF",
-                        data=generate_pdf_report(all_trips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All Trips Report"),
-                        file_name=f"All_Trips_Report_{datetime.date.today()}.pdf",
-                        mime="application/pdf",
-                        key="all_trips_pdf_download"
-                    )
+                # col_ex, col_pdf = st.columns(2) # Removed col2 for PDF
+                # with col_ex:
+                st.download_button(
+                    label="Download All Trips Excel",
+                    data=generate_excel_report(all_trips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All_Trips_Report"),
+                    file_name=f"All_Trips_Report_{datetime.date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="all_trips_excel_download"
+                )
+                # with col_pdf: # Removed PDF download button
+                #     st.download_button(
+                #         label="Download All Trips PDF",
+                #         data=generate_pdf_report(all_trips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "All Trips Report"),
+                #         file_name=f"All_Trips_Report_{datetime.date.today()}.pdf",
+                #         mime="application/pdf",
+                #         key="all_trips_pdf_download"
+                #     )
             else:
                 st.info("No trip data available for cross-company reports yet.")
             
             st.markdown("---")
             st.markdown("#### Custom Management Report (PDF with Company Details)")
-            st.write("This PDF report provides an overview of all companies, including their individual vehicle counts, employees, and financial summaries.")
-            if st.button("Download Management Report (PDF)", key="download_management_pdf_final"):
-                management_pdf_data = generate_management_pdf_report(all_companies_operational_data, USER_DB_CURRENT)
-                st.download_button(
-                    label="Download Management Report PDF",
-                    data=management_pdf_data,
-                    file_name=f"Management_Report_{datetime.date.today()}.pdf",
-                    mime="application/pdf",
-                    key="management_pdf_download_final"
-                )
+            st.info("Management Report PDF generation is removed as requested.")
+            # st.write("This PDF report provides an overview of all companies, including their individual vehicle counts, employees, and financial summaries.")
+            # if st.button("Download Management Report (PDF)", key="download_management_pdf_final"):
+            #     management_pdf_data = generate_management_pdf_report(all_companies_operational_data, USER_DB_CURRENT)
+            #     st.download_button(
+            #         label="Download Management Report PDF",
+            #         data=management_pdf_data,
+            #         file_name=f"Management_Report_{datetime.date.today()}.pdf",
+            #         mime="application/pdf",
+            #         key="management_pdf_download_final"
+            #     )
 
 
         elif menu_selection == "User & Company Management":
@@ -2267,25 +2270,25 @@ def main_app():
                             st.rerun()
 
                     st.subheader(f"Download Payslip Reports for {selected_company_name_for_modules}")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        excel_data = generate_excel_report(current_company_payslips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"Payroll_Report_{selected_company_name_for_modules}")
-                        st.download_button(
-                            label=f"Download Payroll Excel ({selected_company_name_for_modules})",
-                            data=excel_data,
-                            file_name=f"Payroll_Report_{selected_company_name_for_modules}_{datetime.date.today()}.xlsx",
-                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            key=f"admin_{selected_company_id_for_modules}_payroll_excel_download"
-                        )
-                    with col2:
-                        pdf_data = generate_pdf_report(current_company_payslips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"Payroll Report ({selected_company_name_for_modules})")
-                        st.download_button(
-                            label=f"Download Payroll PDF ({selected_company_name_for_modules})",
-                            data=pdf_data,
-                            file_name=f"Payroll_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
-                            mime="application/pdf",
-                            key=f"admin_{selected_company_id_for_modules}_payroll_pdf_download"
-                        )
+                    # col1, col2 = st.columns(2) # Removed col2 for PDF
+                    # with col1:
+                    excel_data = generate_excel_report(current_company_payslips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"Payroll_Report_{selected_company_name_for_modules}")
+                    st.download_button(
+                        label=f"Download Payroll Excel ({selected_company_name_for_modules})",
+                        data=excel_data,
+                        file_name=f"Payroll_Report_{selected_company_name_for_modules}_{datetime.date.today()}.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key=f"admin_{selected_company_id_for_modules}_payroll_excel_download"
+                    )
+                    # with col2: # Removed PDF download button
+                    #     pdf_data = generate_pdf_report(current_company_payslips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"Payroll Report ({selected_company_name_for_modules})")
+                    #     st.download_button(
+                    #         label=f"Download Payroll PDF ({selected_company_name_for_modules})",
+                    #         data=pdf_data,
+                    #         file_name=f"Payroll_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
+                    #         mime="application/pdf",
+                    #         key=f"admin_{selected_company_id_for_modules}_payroll_pdf_download"
+                    #     )
 
                     st.markdown("---")
 
@@ -2298,18 +2301,19 @@ def main_app():
                     st.info("Automate VAT calculation and generate VAT return reports here.")
                     st.write("Output VAT from Sales Invoices.")
                     st.write("Input VAT from Purchases.")
-                    st.write("Auto-generate VAT Return Report for export.")
-                    if st.button(f"Generate VAT Return Report ({selected_company_name_for_modules})", key=f"admin_{selected_company_id_for_modules}_generate_vat_report"):
-                        vat_data_for_report = get_db_collection(selected_company_id_for_modules, 'vat_transactions')
-                        vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"VAT Return Report for {selected_company_name_for_modules}")
-                        st.download_button(
-                            label=f"Download VAT Return Report PDF ({selected_company_name_for_modules})",
-                            data=vat_report_pdf,
-                            file_name=f"VAT_Return_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
-                            mime="application/pdf",
-                            key=f"admin_{selected_company_id_for_modules}_vat_pdf_download"
-                        )
-                        st.success(f"VAT Return Report generated (placeholder) for {selected_company_name_for_modules}.")
+                    # st.write("Auto-generate VAT Return Report for export.") # Removed PDF line
+                    st.info("VAT Return Report PDF generation is removed as requested.")
+                    # if st.button(f"Generate VAT Return Report ({selected_company_name_for_modules})", key=f"admin_{selected_company_id_for_modules}_generate_vat_report"):
+                    #     vat_data_for_report = get_db_collection(selected_company_id_for_modules, 'vat_transactions')
+                    #     vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"VAT Return Report for {selected_company_name_for_modules}")
+                    #     st.download_button(
+                    #         label=f"Download VAT Return Report PDF ({selected_company_name_for_modules})",
+                    #         data=vat_report_pdf,
+                    #         file_name=f"VAT_Return_Report_{selected_company_name_for_modules}_{datetime.date.today()}.pdf",
+                    #         mime="application/pdf",
+                    #         key=f"admin_{selected_company_id_for_modules}_vat_pdf_download"
+                    #     )
+                    #     st.success(f"VAT Return Report generated (placeholder) for {selected_company_name_for_modules}.")
 
 
             else:
@@ -2559,25 +2563,25 @@ def main_app():
                     st.rerun()
 
             st.subheader("Download Payslip Reports")
-            col1, col2 = st.columns(2)
-            with col1:
-                excel_data = generate_excel_report(current_company_payslips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "Payroll_Report")
-                st.download_button(
-                    label="Download Payroll Excel",
-                    data=excel_data,
-                    file_name=f"Payroll_Report_{st.session_state['company_name']}_{datetime.date.today()}.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key=f"{st.session_state['company_id']}_payroll_excel_download"
-                )
-            with col2:
-                pdf_data = generate_pdf_report(current_company_payslips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "Payroll Report")
-                st.download_button(
-                    label="Download Payroll PDF",
-                    data=pdf_data,
-                    file_name=f"Payroll_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
-                    mime="application/pdf",
-                    key=f"{st.session_state['company_id']}_payroll_pdf_download"
-                )
+            # col1, col2 = st.columns(2) # Removed col2 for PDF
+            # with col1:
+            excel_data = generate_excel_report(current_company_payslips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "Payroll_Report")
+            st.download_button(
+                label="Download Payroll Excel",
+                data=excel_data,
+                file_name=f"Payroll_Report_{st.session_state['company_name']}_{datetime.date.today()}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key=f"{st.session_state['company_id']}_payroll_excel_download"
+            )
+            # with col2: # Removed PDF download button
+            #     pdf_data = generate_pdf_report(current_company_payslips_df.drop(columns=['doc_id', 'company_id'], errors='ignore'), "Payroll Report")
+            #     st.download_button(
+            #         label="Download Payroll PDF",
+            #         data=pdf_data,
+            #         file_name=f"Payroll_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
+            #         mime="application/pdf",
+            #         key=f"{st.session_state['company_id']}_payroll_pdf_download"
+            #     )
 
 
         elif selected_module == "Planning & Time Off":
@@ -2602,23 +2606,23 @@ def main_app():
 
             if not all_company_data_for_user_concat.empty:
                 st.dataframe(add_serial_numbers(all_company_data_for_user_concat.drop(columns=['doc_id', 'company_id'], errors='ignore')), use_container_width=True, hide_index=True)
-                col_ex_all, col_pdf_all = st.columns(2)
-                with col_ex_all:
-                    st.download_button(
-                        label=f"Download Consolidated {st.session_state['company_name']} Excel",
-                        data=generate_excel_report(all_company_data_for_user_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{st.session_state['company_id']}_Consolidated_Report"),
-                        file_name=f"{st.session_state['company_name']}_Consolidated_Report_{datetime.date.today()}.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        key=f"{st.session_state['company_id']}_consolidated_excel"
-                    )
-                with col_pdf_all:
-                    st.download_button(
-                        label=f"Download Consolidated {st.session_state['company_name']} PDF",
-                        data=generate_pdf_report(all_company_data_for_user_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{st.session_state['company_name']} Consolidated Report"),
-                        file_name=f"{st.session_state['company_name']}_Consolidated_Report_{datetime.date.today()}.pdf",
-                        mime="application/pdf",
-                        key=f"{st.session_state['company_id']}_consolidated_pdf"
-                    )
+                # col_ex_all, col_pdf_all = st.columns(2) # Removed col2 for PDF
+                # with col_ex_all:
+                st.download_button(
+                    label=f"Download Consolidated {st.session_state['company_name']} Excel",
+                    data=generate_excel_report(all_company_data_for_user_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{st.session_state['company_id']}_Consolidated_Report"),
+                    file_name=f"{st.session_state['company_name']}_Consolidated_Report_{datetime.date.today()}.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key=f"{st.session_state['company_id']}_consolidated_excel"
+                )
+                # with col_pdf_all: # Removed PDF download button
+                #     st.download_button(
+                #         label=f"Download Consolidated {st.session_state['company_name']} PDF",
+                #         data=generate_pdf_report(all_company_data_for_user_concat.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"{st.session_state['company_name']} Consolidated Report"),
+                #         file_name=f"{st.session_state['company_name']}_Consolidated_Report_{datetime.date.today()}.pdf",
+                #         mime="application/pdf",
+                #         key=f"{st.session_state['company_id']}_consolidated_pdf"
+                #     )
             else:
                 st.info(f"No data available to generate a consolidated report for {st.session_state['company_name']} yet. Please add data in other modules.")
 
@@ -2665,18 +2669,19 @@ def main_app():
             st.info("Automate VAT calculation and generate VAT return reports here.")
             st.write("Output VAT from Sales Invoices.")
             st.write("Input VAT from Purchases.")
-            st.write("Auto-generate VAT Return Report for export.")
-            if st.button("Generate VAT Return Report", key=f"{st.session_state['company_id']}_generate_vat_report"):
-                vat_data_for_report = get_db_collection(st.session_state['company_id'], 'vat_transactions')
-                vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"VAT Return Report for {st.session_state['company_name']}")
-                st.download_button(
-                    label=f"Download VAT Return Report PDF ({st.session_state['company_name']})",
-                    data=vat_report_pdf,
-                    file_name=f"VAT_Return_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
-                    mime="application/pdf",
-                    key=f"{st.session_state['company_id']}_vat_pdf_download"
-                )
-                st.success("VAT Return Report generated (placeholder).")
+            # st.write("Auto-generate VAT Return Report for export.") # Removed PDF line
+            st.info("VAT Return Report PDF generation is removed as requested.")
+            # if st.button("Generate VAT Return Report", key=f"{st.session_state['company_id']}_generate_vat_report"):
+            #     vat_data_for_report = get_db_collection(st.session_state['company_id'], 'vat_transactions')
+            #     vat_report_pdf = generate_pdf_report(vat_data_for_report.drop(columns=['doc_id', 'company_id'], errors='ignore'), f"VAT Return Report for {st.session_state['company_name']}")
+            #     st.download_button(
+            #         label=f"Download VAT Return Report PDF ({st.session_state['company_name']})",
+            #         data=vat_report_pdf,
+            #         file_name=f"VAT_Return_Report_{st.session_state['company_name']}_{datetime.date.today()}.pdf",
+            #         mime="application/pdf",
+            #         key=f"{st.session_state['company_id']}_vat_pdf_download"
+            #     )
+            #     st.success("VAT Return Report generated (placeholder).")
 
 
     st.sidebar.markdown("---")
