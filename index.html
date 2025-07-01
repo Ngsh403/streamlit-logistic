@@ -1,0 +1,3082 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logistics ERP System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <!-- Make sure jsPDF is loaded first -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Then add the autoTable plugin -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"
+        integrity="sha512-r22gChDnGvBylk90+2e/ycr3RVrDi8DIOkIGNwZ7eFqnh1m6aKksQfB1ZTAU3O1G3cGw3wO1ffV8XDtT6A3n0ig=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsPDF/2.5.1/jspdf.umd.min.js"
+        integrity="sha512-qZvrmS2ekKPF2mSznTQsxqPgnpkI4DNTlrdUmTzrDgektczlKNRRhy5X5AAahn1mZcg8vJBjVJ0cD7m0ojyA3hw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"
+        integrity="sha512-BNaRQnYHuqZO1E6sV1vHo8U7I9ZLsW8PVcNG3Xb9Wwk88WvdpYht1T8GR5N+w2cL0q2mYZYOu3CSk7MauTwockQ=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        // Fallback for jsPDF if CDN fails
+        window.jspdf = window.jspdf || {};
+        if (!window.jspdf.jsPDF) {
+            console.warn('jsPDF CDN failed to load. Attempting to load from alternative source.');
+            const script = document.createElement('script');
+            script.src = 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js';
+            script.async = true;
+            script.onload = () => console.log('jsPDF fallback loaded successfully');
+            script.onerror = () => {
+                console.error('Failed to load jsPDF from fallback source.');
+                // Optionally, include a local copy of jsPDF here
+                const localScript = document.createElement('script');
+                localScript.src = '/path/to/local/jspdf.umd.min.js'; // Replace with actual path if hosting locally
+                localScript.async = true;
+                document.head.appendChild(localScript);
+            };
+            document.head.appendChild(script);
+        }
+    </script>
+    <style>
+        /* Existing styles would go here */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        /* Login & Signup Styles */
+        .auth-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .auth-card {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+            transform: translateY(0);
+            transition: transform 0.3s ease;
+        }
+
+        .auth-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .auth-title {
+            text-align: center;
+            margin-bottom: 30px;
+            color: #333;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .auth-toggle {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+
+        .auth-toggle a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+
+        /* Dashboard Styles */
+        .dashboard {
+            display: none;
+            background: #f8f9fa;
+            min-height: 100vh;
+        }
+
+        .dashboard.active {
+            display: block;
+        }
+
+        .header {
+            background: white;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header h1 {
+            color: #333;
+            font-size: 24px;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .company-select {
+            padding: 8px 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            padding: 8px 16px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .main-content {
+            display: flex;
+            min-height: calc(100vh - 80px);
+        }
+
+        .sidebar {
+            width: 250px;
+            background: white;
+            padding: 20px;
+            border-right: 1px solid #e1e5e9;
+        }
+
+        .sidebar ul {
+            list-style: none;
+        }
+
+        .sidebar li {
+            margin-bottom: 10px;
+        }
+
+        .sidebar a {
+            display: block;
+            padding: 12px 16px;
+            color: #555;
+            text-decoration: none;
+            border-radius: 8px;
+            transition: background-color 0.3s ease;
+        }
+
+        .sidebar a:hover,
+        .sidebar a.active {
+            background: #667eea;
+            color: white;
+        }
+
+        .content {
+            flex: 1;
+            padding: 20px;
+        }
+
+        .page {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        .page-title {
+            font-size: 24px;
+            margin-bottom: 30px;
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        /* Form Styles */
+        .form-container {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+
+        .form-group-inline {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group-inline label {
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group-inline input,
+        .form-group-inline select,
+        .form-group-inline textarea {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+
+        .form-group-inline textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-primary:hover {
+            background: #5a6fd8;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e1e5e9;
+        }
+
+        .data-table th {
+            background: #667eea;
+            color: white;
+            font-weight: 600;
+        }
+
+        .data-table tr:hover {
+            background: #f8f9fa;
+        }
+
+        /* Stats Cards */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .stat-card h3 {
+            font-size: 32px;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .stat-card p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+
+            .sidebar {
+                width: 100%;
+                order: 2;
+            }
+
+            .content {
+                order: 1;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .header {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+
+        /* Loading Spinner */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Alert Messages */
+        .alert {
+            padding: 12px;
+            margin: 10px 0;
+            border-radius: 6px;
+            display: none;
+        }
+
+        .alert.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .alert.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .alert.show {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Login/Signup Page -->
+    <div id="authContainer" class="auth-container">
+        <div class="auth-card">
+            <div id="loginForm">
+                <h2 class="auth-title">Login</h2>
+                <div class="alert" id="loginAlert"></div>
+                <form id="loginFormElement">
+                    <div class="form-group">
+                        <label for="loginEmail">Email</label>
+                        <input type="email" id="loginEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <input type="password" id="loginPassword" required>
+                    </div>
+                    <button type="submit" class="btn">Login</button>
+                </form>
+                <div class="auth-toggle">
+                    Don't have an account? <a href="#" onclick="showSignup()">Sign up</a>
+                </div>
+            </div>
+
+            <div id="signupForm" style="display: none;">
+                <h2 class="auth-title">Sign Up</h2>
+                <div class="alert" id="signupAlert"></div>
+                <form id="signupFormElement">
+                    <div class="form-group">
+                        <label for="signupName">Full Name</label>
+                        <input type="text" id="signupName" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupEmail">Email</label>
+                        <input type="email" id="signupEmail" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPhone">Phone</label>
+                        <input type="tel" id="signupPhone" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupCompany">Company</label>
+                        <select id="signupCompany" required>
+                            <option value="">Select Company</option>
+                            <option value="east-concord">East Concord</option>
+                            <option value="sa-concord">SA Concord</option>
+                            <option value="north-concord">North Concord</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="signupPassword">Password</label>
+                        <input type="password" id="signupPassword" required>
+                    </div>
+                    <button type="submit" class="btn">Sign Up</button>
+                </form>
+                <div class="auth-toggle">
+                    Already have an account? <a href="#" onclick="showLogin()">Login</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div id="dashboard" class="dashboard">
+        <div class="header">
+            <h1>Logistics ERP System</h1>
+            <div class="user-info">
+                <span id="userWelcome">Welcome, User</span>
+                <select id="companySelect" class="company-select" style="display: none;">
+                    <option value="east-concord">East Concord</option>
+                    <option value="sa-concord">SA Concord</option>
+                    <option value="north-concord">North Concord</option>
+                </select>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <div class="main-content">
+            <div class="sidebar">
+                <ul>
+                    <li><a href="#" onclick="showPage('overview')" class="active">Overview</a></li>
+                    <li><a href="#" onclick="showPage('tripManagement')">Trip Management</a></li>
+                    <li><a href="#" onclick="showPage('trips')">Trips</a></li>
+                    <li><a href="#" onclick="showPage('rentals')">Rentals</a></li>
+                    <li><a href="#" onclick="showPage('fleet')">Fleet</a></li>
+                    <li><a href="#" onclick="showPage('invoicing')">Invoicing</a></li>
+                    <li><a href="#" onclick="showPage('clients')">Clients</a></li>
+                    <li><a href="#" onclick="showPage('employees')">Employees</a></li>
+                    <li><a href="#" onclick="showPage('payroll')">Payroll</a></li>
+                    <li><a href="#" onclick="showPage('planning')">Planning</a></li>
+                    <li><a href="#" onclick="showPage('reports')">Reports</a></li>
+                    <li><a href="#" onclick="showPage('vat')">VAT</a></li>
+                </ul>
+            </div>
+
+            <div class="content">
+                <!-- Overview Page -->
+                <div id="overviewPage" class="page active">
+                    <h2 class="page-title">Dashboard Overview</h2>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3 id="totalTrips">0</h3>
+                            <p>Total Trips</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3 id="totalVehicles">0</h3>
+                            <p>Total Vehicles</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3 id="totalClients">0</h3>
+                            <p>Total Clients</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3 id="totalEmployees">0</h3>
+                            <p>Total Employees</p>
+                        </div>
+                    </div>
+                    <div class="loading" id="overviewLoading">
+                        <div class="spinner"></div>
+                        <p>Loading dashboard data...</p>
+                    </div>
+                </div>
+
+                <!-- Trip Management Page -->
+                <div id="tripManagementPage" class="page">
+                    <h2 class="page-title">Trip Management - All Companies</h2>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Trip ID</th>
+                                    <th>Company</th>
+                                    <th>Customer</th>
+                                    <th>Location</th>
+                                    <th>Vehicle</th>
+                                    <th>Driver</th>
+                                    <th>Date</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="allTripsTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Trips Page -->
+                <div id="tripsPage" class="page">
+                    <h2 class="page-title">Trips</h2>
+                    <div class="form-container">
+                        <h3>Add Trip</h3>
+                        <div class="alert" id="tripFormAlert"></div>
+                        <form id="tripForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="tripCustomer">Customer</label>
+                                    <select id="tripCustomer" required>
+                                        <option value="">Select Customer</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="tripNumberOfTrips">Number of Trips</label>
+                                    <input type="number" id="tripNumberOfTrips" min="1" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="tripLocation">Location</label>
+                                    <input type="text" id="tripLocation" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="tripVehicle">Vehicle</label>
+                                    <select id="tripVehicle" required>
+                                        <option value="">Select Vehicle</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="tripDriver"> Driver</label>
+                                    <select id="tripDriver" required>
+                                        <option value="">Select Driver</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="tripDate">Trip Date</label>
+                                    <input type="date" id="tripDate" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="tripRemarks">Remarks</label>
+                                    <textarea id="tripRemarks" placeholder="Optional remarks"></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save Trip</button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Trip ID</th>
+                                    <th>Customer</th>
+                                    <th>Location</th>
+                                    <th>Vehicle</th>
+                                    <th>Driver</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tripsTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Rentals Page -->
+                <div id="rentalsPage" class="page">
+                    <h2 class="page-title">Rentals</h2>
+                    <div class="form-container">
+                        <h3>Add Rental</h3>
+                        <div class="alert" id="rentalFormAlert"></div>
+                        <form id="rentalForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="rentalStartDate">Start Date</label>
+                                    <input type="date" id="rentalStartDate" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="rentalEndDate">End Date</label>
+                                    <input type="date" id="rentalEndDate" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="rentalClient">Client</label>
+                                    <select id="rentalClient" required>
+                                        <option value="">Select Client</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="rentalVehicle">Vehicle</label>
+                                    <select id="rentalVehicle" required>
+                                        <option value="">Select Vehicle</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="rentalDriver">Driver (Optional)</label>
+                                    <select id="rentalDriver">
+                                        <option value="">No Driver</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="rentalRate">Daily/Monthly Rate</label>
+                                    <input type="number" id="rentalRate" step="0.01" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label>
+                                        <input type="checkbox" id="rentalVATExcluded"> VAT Excluded
+                                    </label>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label>
+                                        <input type="checkbox" id="rentalFuelIncluded"> Fuel Included
+                                    </label>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="rentalStatus">Status</label>
+                                    <select id="rentalStatus" required>
+                                        <option value="Active">Active</option>
+                                        <option value="Completed">Completed</option>
+                                        <option value="Cancelled">Cancelled</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="rentalMaintenanceNotes">Maintenance Notes</label>
+                                    <textarea id="rentalMaintenanceNotes"
+                                        placeholder="Optional maintenance notes"></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save Rental</button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Rental ID</th>
+                                    <th>Client</th>
+                                    <th>Vehicle</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rentalsTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Fleet Page -->
+                <div id="fleetPage" class="page">
+                    <h2 class="page-title">Fleet Management</h2>
+                    <div class="form-container">
+                        <h3>Add Vehicle</h3>
+                        <div class="alert" id="fleetFormAlert"></div>
+                        <form id="fleetForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="vehicleSadeemNo">Sadeem No</label>
+                                    <input type="text" id="vehicleSadeemNo" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehiclePlateNumber">Plate Number</label>
+                                    <input type="text" id="vehiclePlateNumber" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleCRName">CR Name (Company Name)</label>
+                                    <input type="text" id="vehicleCRName" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleCRNo">CR No (Registration Number)</label>
+                                    <input type="text" id="vehicleCRNo" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleType">Vehicle Type</label>
+                                    <select id="vehicleType" required>
+                                        <option value="">Select Vehicle Type</option>
+                                        <option value="Truck">Truck</option>
+                                        <option value="Van">Van</option>
+                                        <option value="Trailer">Trailer</option>
+                                        <option value="Pickup">Pickup</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleModel">Vehicle Model</label>
+                                    <input type="text" id="vehicleModel" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleManufactureYear">Manufacture Year</label>
+                                    <input type="number" id="vehicleManufactureYear" min="1900" max="2030" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleLoadCapacity">Load Capacity (tons)</label>
+                                    <input type="number" id="vehicleLoadCapacity" step="0.1" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleRegistrationExpiry">Registration Expiry Date</label>
+                                    <input type="date" id="vehicleRegistrationExpiry" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleInsuranceExpiry">Insurance Expiry Date</label>
+                                    <input type="date" id="vehicleInsuranceExpiry" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleMulkiyaExpiry">Mulkiya Expiry Date</label>
+                                    <input type="date" id="vehicleMulkiyaExpiry" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleTransportType">Transport Type</label>
+                                    <select id="vehicleTransportType" required>
+                                        <option value="">Select Transport Type</option>
+                                        <option value="Local">Local</option>
+                                        <option value="International">International</option>
+                                        <option value="Both">Both</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleMaintenanceSchedule">Maintenance Schedule</label>
+                                    <input type="text" id="vehicleMaintenanceSchedule"
+                                        placeholder="e.g., Every 6 months or 10,000 km">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleOdometerReading">Current Odometer Reading (km)</label>
+                                    <input type="number" id="vehicleOdometerReading" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleFuelConsumption">Average Fuel Consumption (L/100km)</label>
+                                    <input type="number" id="vehicleFuelConsumption" step="0.1">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vehicleStatus">Vehicle Status</label>
+                                    <select id="vehicleStatus" required>
+                                        <option value="Available">Available</option>
+                                        <option value="In Use">In Use</option>
+                                        <option value="Maintenance">Maintenance</option>
+                                        <option value="Out of Service">Out of Service</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save Vehicle</button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Vehicle ID</th>
+                                    <th>Plate Number</th>
+                                    <th>Type</th>
+                                    <th>Model</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fleetTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Invoicing Page -->
+                <div id="invoicingPage" class="page">
+                    <h2 class="page-title">Invoicing</h2>
+                    <div class="form-container">
+                        <h3>Add Invoice/Quote</h3>
+                        <div class="alert" id="invoiceFormAlert"></div>
+                        <form id="invoiceForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="invoiceClient">Client</label>
+                                    <select id="invoiceClient" required>
+                                        <option value="">Select Client</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="invoiceTrip">Trip (Optional)</label>
+                                    <select id="invoiceTrip">
+                                        <option value="">No Trip</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="invoiceRental">Rental (Optional)</label>
+                                    <select id="invoiceRental">
+                                        <option value="">No Rental</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="invoiceAmount">Amount</label>
+                                    <input type="number" id="invoiceAmount" step="0.01" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="invoiceServiceFee">Service Fee</label>
+                                    <input type="number" id="invoiceServiceFee" step="0.01" value="0">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="invoiceTaxRate">Tax Rate (%)</label>
+                                    <input type="number" id="invoiceTaxRate" step="0.01" value="0">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label>
+                                        <input type="checkbox" id="invoiceVATIncluded"> VAT Included
+                                    </label>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="invoiceType">Type</label>
+                                    <select id="invoiceType" required>
+                                        <option value="Invoice">Invoice</option>
+                                        <option value="Quote">Quote</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <button type="submit" class="btn-primary">Save Invoice</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Invoice ID</th>
+                                    <th>Client</th>
+                                    <th>Amount</th>
+                                    <th>Type</th>
+                                    <th>Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="invoicingTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Clients Page -->
+                <div id="clientsPage" class="page">
+                    <h2 class="page-title">Clients</h2>
+                    <div class="form-container">
+                        <h3>Add Client</h3>
+                        <div class="alert" id="clientFormAlert"></div>
+                        <form id="clientForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="clientCompanyName">Company Name</label>
+                                    <input type="text" id="clientCompanyName" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientContactPerson">Contact Person Name</label>
+                                    <input type="text" id="clientContactPerson" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientMobile">Mobile Number</label>
+                                    <input type="tel" id="clientMobile" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientEmail">Email Address</label>
+                                    <input type="email" id="clientEmail" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientAddress">Address</label>
+                                    <input type="text" id="clientAddress" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientRegion">Region</label>
+                                    <input type="text" id="clientRegion" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientPriority">Priority</label>
+                                    <select id="clientPriority" required>
+                                        <option value="High">High</option>
+                                        <option value="Medium">Medium</option>
+                                        <option value="Low">Low</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientType">Type of Client</label>
+                                    <select id="clientType" required>
+                                        <option value="Corporate">Corporate</option>
+                                        <option value="Individual">Individual</option>
+                                        <option value="Government">Government</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientServicesSubscribed">Services Subscribed</label>
+                                    <select id="clientServicesSubscribed" required>
+                                        <option value="Truck Rental">Truck Rental</option>
+                                        <option value="Transportation">Transportation</option>
+                                        <option value="Logistics">Logistics</option>
+                                        <option value="All Services">All Services</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="clientStatus">Client Status</label>
+                                    <select id="clientStatus" required>
+                                        <option value="Active">Active</option>
+                                        <option value="Inactive">Inactive</option>
+                                        <option value="Suspended">Suspended</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save Client</button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Client ID</th>
+                                    <th>Company Name</th>
+                                    <th>Contact Person</th>
+                                    <th>Mobile</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="clientsTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Employees Page -->
+                <div id="employeesPage" class="page">
+                    <h2 class="page-title">Employees</h2>
+                    <div class="form-container">
+                        <h3>Add Employee</h3>
+                        <div class="alert" id="employeeFormAlert"></div>
+                        <form id="employeeForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="employeeFullName">Full Name</label>
+                                    <input type="text" id="employeeFullName" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="employeeNationality">Nationality</label>
+                                    <input type="text" id="employeeNationality" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="employeeCPRNumber">CPR Number</label>
+                                    <input type="text" id="employeeCPRNumber" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="employeeJobTitle">Job Title</label>
+                                    <select id="employeeJobTitle" required>
+                                        <option value="Driver">Driver</option>
+                                        <option value="Operator">Operator</option>
+                                        <option value="Supervisor">Supervisor</option>
+                                        <option value="Manager">Manager</option>
+                                        <option value="Admin">Admin</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="employeeJoiningDate">Joining Date</label>
+                                    <input type="date" id="employeeJoiningDate" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="employeeMobile">Mobile Number</label>
+                                    <input type="tel" id="employeeMobile" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="employeeDepartment">Department</label>
+                                    <input type="text" id="employeeDepartment" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="employeeShift">Shift</label>
+                                    <select id="employeeShift" required>
+                                        <option value="Day">Day</option>
+                                        <option value="Night">Night</option>
+                                        <option value="Rotational">Rotational</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save Employee</button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee ID</th>
+                                    <th>Full Name</th>
+                                    <th>Job Title</th>
+                                    <th>Mobile</th>
+                                    <th>Joining Date</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="employeesTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Payroll Page -->
+                <div id="payrollPage" class="page">
+                    <h2 class="page-title">Payroll</h2>
+                    <div class="form-container">
+                        <h3>Add Payroll</h3>
+                        <div class="alert" id="payrollFormAlert"></div>
+                        <form id="payrollForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="payrollEmployee">Employee</label>
+                                    <select id="payrollEmployee" required>
+                                        <option value="">Select Employee</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="payrollPeriod">Period</label>
+                                    <input type="month" id="payrollPeriod" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="payrollBaseSalary">Base Salary</label>
+                                    <input type="number" id="payrollBaseSalary" step="0.01" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="payrollTripBonus">Trip Bonus</label>
+                                    <input type="number" id="payrollTripBonus" step="0.01" value="0">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="payrollRentalCommission">Rental Commission</label>
+                                    <input type="number" id="payrollRentalCommission" step="0.01" value="0">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="payrollDeductions">Deductions</label>
+                                    <input type="number" id="payrollDeductions" step="0.01" value="0">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="payrollOvertime">Overtime</label>
+                                    <input type="number" id="payrollOvertime" step="0.01" value="0">
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="payrollPaymentStatus">Payment Status</label>
+                                    <select id="payrollPaymentStatus" required>
+                                        <option value="Unpaid">Unpaid</option>
+                                        <option value="Paid">Paid</option>
+                                        <option value="Partial">Partial</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save Payroll</button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Employee</th>
+                                    <th>Period</th>
+                                    <th>Base Salary</th>
+                                    <th>Total Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payrollTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Planning Page -->
+                <div id="planningPage" class="page">
+                    <h2 class="page-title">Planning</h2>
+                    <div class="form-container">
+                        <h3>Add Plan</h3>
+                        <div class="alert" id="planningFormAlert"></div>
+                        <form id="planningForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="planEmployee">Employee</label>
+                                    <select id="planEmployee" required>
+                                        <option value="">Select Employee</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="planType">Type</label>
+                                    <select id="planType" required>
+                                        <option value="Leave">Leave</option>
+                                        <option value="Training">Training</option>
+                                        <option value="Assignment">Assignment</option>
+                                        <option value="Maintenance">Maintenance</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="planStartDate">Start Date</label>
+                                    <input type="date" id="planStartDate" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="planEndDate">End Date</label>
+                                    <input type="date" id="planEndDate" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="planStatus">Status</label>
+                                    <select id="planStatus" required>
+                                        <option value="Pending">Pending</option>
+                                        <option value="Approved">Approved</option>
+                                        <option value="Rejected">Rejected</option>
+                                        <option value="Completed">Completed</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="planNotes">Notes</label>
+                                    <textarea id="planNotes" placeholder="Optional notes"></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save Plan</button>
+                        </form>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Plan ID</th>
+                                    <th>Employee</th>
+                                    <th>Type</th>
+                                    <th>Start Date</th>
+                                    <th>End Date</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="planningTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Reports Page -->
+                <div id="reportsPage" class="page">
+                    <h2 class="page-title">Reports</h2>
+                    <div class="form-container">
+                        <h3>Audit Balance Entry</h3>
+                        <div class="alert" id="auditFormAlert"></div>
+                        <form id="auditForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="auditPeriod">Audit Period</label>
+                                    <input type="month" id="auditPeriod" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="auditOpeningBalance">Opening Balance</label>
+                                    <input type="number" id="auditOpeningBalance" step="0.01" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="auditClosingBalance">Closing Balance</label>
+                                    <input type="number" id="auditClosingBalance" step="0.01" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Add Balance</button>
+                        </form>
+                    </div>
+                    <div style="margin: 20px 0;">
+                        <h3>Trips by Client Report</h3>
+                        <button class="btn-secondary" onclick="exportTripsCSV()">Export to CSV</button>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Client</th>
+                                    <th>Total Trips</th>
+                                    <th>Total Amount</th>
+                                    <th>Last Trip Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="reportsTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- VAT Page -->
+                <div id="vatPage" class="page">
+                    <h2 class="page-title">VAT Management</h2>
+                    <div class="form-container">
+                        <h3>Add VAT Entry</h3>
+                        <div class="alert" id="vatFormAlert"></div>
+                        <form id="vatForm">
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="vatType">Type</label>
+                                    <select id="vatType" required>
+                                        <option value="Output VAT">Output VAT</option>
+                                        <option value="Input VAT">Input VAT</option>
+                                    </select>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vatAmount">Amount</label>
+                                    <input type="number" id="vatAmount" step="0.01" required>
+                                </div>
+                                <div class="form-group-inline">
+                                    <label for="vatDate">Date</label>
+                                    <input type="date" id="vatDate" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group-inline">
+                                    <label for="vatDescription">Description</label>
+                                    <textarea id="vatDescription" placeholder="VAT entry description"
+                                        required></textarea>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn-primary">Save VAT Entry</button>
+                        </form>
+                    </div>
+                    <div style="margin: 20px 0;">
+                        <h3>VAT Return Report</h3>
+                        <button class="btn-secondary" onclick="exportVATReport()">Export VAT Report</button>
+                    </div>
+                    <div class="stats-grid">
+                        <div class="stat-card">
+                            <h3 id="outputVATTotal">£0.00</h3>
+                            <p>Output VAT</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3 id="inputVATTotal">£0.00</h3>
+                            <p>Input VAT</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3 id="netVATTotal">£0.00</h3>
+                            <p>Net VAT</p>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Amount</th>
+                                    <th>Description</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vatTable">
+                                <!-- Data will be populated here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+        import { getFirestore, collection, addDoc, getDocs, getDoc, doc, updateDoc, deleteDoc, query, where, orderBy, limit, enableIndexedDbPersistence, setLogLevel } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+        // Enable Firestore debug logging for troubleshooting
+        setLogLevel('debug');
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDNXTKPOn2xnwkIINrc4jaOrH3gd_tadhY",
+            authDomain: "logistics-2aa90.firebaseapp.com",
+            databaseURL: "https://logistics-2aa90-default-rtdb.firebaseio.com",
+            projectId: "logistics-2aa90",
+            storageBucket: "logistics-2aa90.firebasestorage.app",
+            messagingSenderId: "801471549182",
+            appId: "1:801471549182:web:690ccc7389a68273fa5faf",
+            measurementId: "G-TV5PNRGP5L"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        // Enable offline persistence
+        enableIndexedDbPersistence(db).catch((err) => {
+            if (err.code === 'failed-precondition') {
+                console.warn('Multiple tabs open, persistence can only be enabled in one tab at a time.');
+            } else if (err.code === 'unimplemented') {
+                console.warn('The current browser does not support persistence.');
+            }
+        });
+        // Global variables
+        let currentUser = null;
+        let currentCompany = null;
+        let isAdmin = false;
+
+        // Make Firebase functions available globally
+        window.db = db;
+        window.collection = collection;
+        window.addDoc = addDoc;
+        window.getDocs = getDocs;
+        window.getDoc = getDoc;
+        window.doc = doc;
+        window.updateDoc = updateDoc;
+        window.deleteDoc = deleteDoc;
+        window.query = query;
+        window.where = where;
+        window.orderBy = orderBy;
+        window.limit = limit;
+
+        // Utility functions
+        function generateID(prefix) {
+            const timestamp = Date.now().toString().slice(-6);
+            const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+            return `${prefix}${timestamp}${random}`;
+        }
+
+        function showAlert(elementId, message, type = 'error') {
+            const alert = document.getElementById(elementId);
+            if (alert) {
+                alert.textContent = message;
+                alert.className = `alert ${type} show`;
+                setTimeout(() => {
+                    alert.classList.remove('show');
+                }, 5000);
+            } else {
+                console.warn(`Alert element ${elementId} not found`);
+            }
+        }
+
+        function formatDate(date) {
+            if (!date) return '';
+            return new Date(date).toLocaleDateString();
+        }
+
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(amount || 0);
+        }
+
+        // Initialize sub-collections for a company
+        async function initializeCompanySubCollections(company) {
+            const subCollections = [
+                'tripManagement', 'trips', 'rentals', 'fleet',
+                'invoicing', 'clients', 'employees', 'payroll',
+                'planning', 'reports', 'vat'
+            ];
+
+            try {
+                for (const subCollection of subCollections) {
+                    const snapshot = await getDocs(collection(db, company, 'data', subCollection));
+                    if (snapshot.empty) {
+                        await addDoc(collection(db, company, 'data', subCollection), {
+                            initialized: true,
+                            createdAt: new Date().toISOString()
+                        });
+                        console.log(`Initialized sub-collection: ${subCollection} for company: ${company}`);
+                    }
+                }
+            } catch (error) {
+                console.error(`Error initializing sub-collections for ${company}:`, {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+            }
+        }
+
+        // Clean up dummy documents
+        async function cleanUpDummyDocuments(company, subCollection) {
+            try {
+                const snapshot = await getDocs(query(collection(db, company, 'data', subCollection), where('initialized', '==', true)));
+                for (const docSnap of snapshot.docs) {
+                    await deleteDoc(docSnap.ref);
+                    console.log(`Deleted dummy document in ${subCollection} for company: ${company}`);
+                }
+            } catch (error) {
+                console.error(`Error cleaning up dummy documents in ${subCollection}:`, {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+            }
+        }
+
+        // Authentication functions
+        function showLogin() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('signupForm').style.display = 'none';
+        }
+
+        function showSignup() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('signupForm').style.display = 'block';
+        }
+
+        window.showLogin = showLogin;
+        window.showSignup = showSignup;
+
+        // Login handler
+        document.getElementById('loginFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            try {
+                // Check for admin login (temporary, replace with proper role-based auth)
+                if (email === 'admin@gmail.com' && password === 'Admin#123') {
+                    currentUser = { email: 'admin@gmail.com', name: 'Administrator', isAdmin: true };
+                    isAdmin = true;
+                    document.getElementById('companySelect').style.display = 'block';
+                    currentCompany = 'east-concord';
+                    showDashboard();
+                    return;
+                }
+
+                // Firebase Authentication
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Fetch user data from Firestore
+                const companies = ['east-concord', 'sa-concord', 'north-concord'];
+                for (const company of companies) {
+                    const q = query(collection(db, company, 'data', 'users'), where('email', '==', email));
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        currentUser = { ...querySnapshot.docs[0].data(), id: user.uid };
+                        currentCompany = company;
+                        showDashboard();
+                        return;
+                    }
+                }
+
+                showAlert('loginAlert', 'User not found in any company');
+            } catch (error) {
+                console.error('Login error:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('loginAlert', `Login failed: ${error.message}`);
+            }
+        });
+
+        // Signup handler
+        document.getElementById('signupFormElement').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('signupName').value;
+            const email = document.getElementById('signupEmail').value;
+            const phone = document.getElementById('signupPhone').value;
+            const company = document.getElementById('signupCompany').value;
+            const password = document.getElementById('signupPassword').value;
+
+            try {
+                // Create user with Firebase Authentication
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                try {
+                    // Store user data in Firestore
+                    await addDoc(collection(db, company, 'data', 'users'), {
+                        name,
+                        email,
+                        phone,
+                        company,
+                        uid: user.uid,
+                        createdAt: new Date().toISOString()
+                    });
+
+                    // Initialize sub-collections for the company
+                    await initializeCompanySubCollections(company);
+
+                    showAlert('signupAlert', 'Account created successfully! Please login.', 'success');
+                    setTimeout(() => {
+                        showLogin();
+                    }, 2000);
+                } catch (firestoreError) {
+                    console.error('Firestore error during signup:', {
+                        message: firestoreError.message,
+                        code: firestoreError.code,
+                        details: firestoreError.details || 'No additional details'
+                    });
+                    // Delete the auth user if Firestore write fails
+                    await auth.currentUser.delete();
+                    showAlert('signupAlert', `Failed to create user data: ${firestoreError.message}`);
+                }
+            } catch (authError) {
+                console.error('Signup error:', {
+                    message: authError.message,
+                    code: authError.code,
+                    details: authError.details || 'No additional details'
+                });
+                if (authError.code === 'auth/email-already-in-use') {
+                    showAlert('signupAlert', 'This email is already in use. Please try logging in or use a different email.');
+                } else {
+                    showAlert('signupAlert', `Signup failed: ${authError.message}`);
+                }
+            }
+        });
+
+        function showDashboard() {
+            document.getElementById('authContainer').style.display = 'none';
+            document.getElementById('dashboard').classList.add('active');
+            document.getElementById('userWelcome').textContent = `Welcome, ${currentUser.name}`;
+
+            if (isAdmin) {
+                document.getElementById('companySelect').style.display = 'block';
+                document.getElementById('companySelect').value = currentCompany;
+                document.getElementById('companySelect').addEventListener('change', (e) => {
+                    currentCompany = e.target.value;
+                    loadAllData();
+                });
+            }
+
+            loadAllData();
+        }
+
+        function logout() {
+            currentUser = null;
+            currentCompany = null;
+            isAdmin = false;
+            document.getElementById('authContainer').style.display = 'flex';
+            document.getElementById('dashboard').classList.remove('active');
+            document.getElementById('companySelect').style.display = 'none';
+            showLogin();
+        }
+
+        window.logout = logout;
+
+        // Navigation
+        function showPage(pageId) {
+            document.querySelectorAll('.page').forEach(page => {
+                page.classList.remove('active');
+            });
+
+            document.querySelectorAll('.sidebar a').forEach(link => {
+                link.classList.remove('active');
+            });
+
+            document.getElementById(pageId + 'Page').classList.add('active');
+
+            event.target.classList.add('active');
+
+            loadPageData(pageId);
+        }
+
+        window.showPage = showPage;
+
+        // Data loading functions
+        async function loadAllData() {
+            if (!currentCompany) return;
+
+            try {
+                await Promise.all([
+                    loadDashboardStats(),
+                    loadClients(),
+                    loadEmployees(),
+                    loadVehicles(),
+                    loadTrips(),
+                    loadRentals(),
+                    loadInvoices(),
+                    loadPayroll(),
+                    loadPlanning(),
+                    loadReports(),
+                    loadVAT(),
+                    loadTripManagement()
+                ]);
+            } catch (error) {
+                console.error('Error loading data:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('loginAlert', `Error loading dashboard data: ${error.message}`);
+            }
+        }
+
+        async function loadDashboardStats() {
+            document.getElementById('overviewLoading').style.display = 'block';
+            try {
+                const companies = isAdmin ? ['east-concord', 'sa-concord', 'north-concord'] : [currentCompany];
+                let totalTrips = 0, totalVehicles = 0, totalClients = 0, totalEmployees = 0;
+
+                for (const company of companies) {
+                    const tripsSnap = await getDocs(collection(db, company, 'data', 'trips'));
+                    const vehiclesSnap = await getDocs(collection(db, company, 'data', 'fleet'));
+                    const clientsSnap = await getDocs(collection(db, company, 'data', 'clients'));
+                    const employeesSnap = await getDocs(collection(db, company, 'data', 'employees'));
+
+                    totalTrips += tripsSnap.size;
+                    totalVehicles += vehiclesSnap.size;
+                    totalClients += clientsSnap.size;
+                    totalEmployees += employeesSnap.size;
+                }
+
+                document.getElementById('totalTrips').textContent = totalTrips;
+                document.getElementById('totalVehicles').textContent = totalVehicles;
+                document.getElementById('totalClients').textContent = totalClients;
+                document.getElementById('totalEmployees').textContent = totalEmployees;
+            } catch (error) {
+                console.error('Error loading stats:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+            } finally {
+                document.getElementById('overviewLoading').style.display = 'none';
+            }
+        }
+
+        async function loadClients() {
+            const clientSelects = ['tripCustomer', 'rentalClient', 'invoiceClient'];
+            clientSelects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                select.innerHTML = '<option value="">Select Client</option>';
+            });
+
+            try {
+                const snapshot = await getDocs(query(collection(db, currentCompany, 'data', 'clients'), where('clientStatus', '==', 'Active'), limit(50)));
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    clientSelects.forEach(selectId => {
+                        const select = document.getElementById(selectId);
+                        const option = document.createElement('option');
+                        option.value = doc.id;
+                        option.textContent = data.clientCompanyName;
+                        select.appendChild(option);
+                    });
+                });
+
+                const tableBody = document.getElementById('clientsTable');
+                tableBody.innerHTML = '';
+                const allClientsSnap = await getDocs(query(collection(db, currentCompany, 'data', 'clients'), limit(50)));
+                allClientsSnap.forEach(doc => {
+                    const data = doc.data();
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${data.clientId}</td>
+                        <td>${data.clientCompanyName}</td>
+                        <td>${data.clientContactPerson}</td>
+                        <td>${data.clientMobile}</td>
+                        <td>${data.clientStatus}</td>
+                        <td>
+                            ${isAdmin ? `
+                                <button class="btn-secondary" onclick="editRecord('clients', '${doc.id}')">Edit</button>
+                                <button class="btn-danger" onclick="deleteRecord('clients', '${doc.id}')">Delete</button>
+                            ` : ''}
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error loading clients:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('clientFormAlert', `Error loading clients: ${error.message}`);
+            }
+        }
+
+        async function loadEmployees() {
+            const employeeSelects = ['tripDriver', 'rentalDriver', 'payrollEmployee', 'planEmployee'];
+            employeeSelects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                select.innerHTML = selectId === 'rentalDriver' ? '<option value="">No Driver</option>' : '<option value="">Select Employee</option>';
+            });
+
+            try {
+                const snapshot = await getDocs(query(collection(db, currentCompany, 'data', 'employees'), where('employeeJobTitle', '==', 'Driver'), limit(50)));
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    ['tripDriver', 'rentalDriver'].forEach(selectId => {
+                        const select = document.getElementById(selectId);
+                        const option = document.createElement('option');
+                        option.value = doc.id;
+                        option.textContent = data.employeeFullName || 'Unnamed Driver';
+                        select.appendChild(option);
+                    });
+                });
+
+                const tableBody = document.getElementById('employeesTable');
+                tableBody.innerHTML = '';
+                const allEmployeesSnap = await getDocs(query(collection(db, currentCompany, 'data', 'employees'), limit(50)));
+                allEmployeesSnap.forEach(doc => {
+                    const data = doc.data();
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = data.employeeFullName || 'Unnamed Employee';
+                    ['payrollEmployee', 'planEmployee'].forEach(selectId => {
+                        document.getElementById(selectId).appendChild(option.cloneNode(true));
+                    });
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                <td>${data.employeeId || 'N/A'}</td>
+                <td>${data.employeeFullName || 'N/A'}</td>
+                <td>${data.employeeJobTitle || 'N/A'}</td>
+                <td>${data.employeeMobile || 'N/A'}</td>
+                <td>${formatDate(data.employeeJoiningDate) || 'N/A'}</td>
+                <td>
+                    ${isAdmin ? `
+                        <button class="btn-secondary" onclick="editRecord('employees', '${doc.id}')">Edit</button>
+                        <button class="btn-danger" onclick="deleteRecord('employees', '${doc.id}')">Delete</button>
+                    ` : ''}
+                </td>
+            `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error loading employees:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('employeeFormAlert', `Error loading employees: ${error.message}`);
+            }
+        }
+
+       async function loadVehicles() {
+    const vehicleSelects = ['tripVehicle', 'rentalVehicle'];
+    vehicleSelects.forEach(selectId => {
+        const select = document.getElementById(selectId);
+        select.innerHTML = '<option value="">Select Vehicle</option>';
+    });
+
+    try {
+        // Load available vehicles for dropdowns - using correct field name 'status'
+        const snapshot = await getDocs(query(
+            collection(db, currentCompany, 'data', 'fleet'), 
+            where('status', '==', 'Available'), 
+            limit(50)
+        ));
+        
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            vehicleSelects.forEach(selectId => {
+                const select = document.getElementById(selectId);
+                const option = document.createElement('option');
+                option.value = doc.id;
+                // Using correct field names: 'model' and 'plateNumber'
+                option.textContent = `${data.model || 'Unknown Model'} (${data.plateNumber || 'No Plate'})`;
+                select.appendChild(option);
+            });
+        });
+
+        // Load all vehicles for table display
+        const tableBody = document.getElementById('fleetTable');
+        tableBody.innerHTML = '';
+        
+        const allVehiclesSnap = await getDocs(query(
+            collection(db, currentCompany, 'data', 'fleet'), 
+            limit(50)
+        ));
+        
+        allVehiclesSnap.forEach(doc => {
+            const data = doc.data();
+            const row = document.createElement('tr');
+            
+            // Using the correct field names from your actual Firestore data
+            row.innerHTML = `
+                <td>${data.vehicleId || 'N/A'}</td>
+                <td>${data.plateNumber || 'N/A'}</td>
+                <td>${data.type || 'N/A'}</td>
+                <td>${data.model || 'N/A'}</td>
+                <td>${data.status || 'N/A'}</td>
+                <td>
+                    ${isAdmin ? `
+                        <button class="btn-secondary" onclick="editRecord('fleet', '${doc.id}')">Edit</button>
+                        <button class="btn-danger" onclick="deleteRecord('fleet', '${doc.id}')">Delete</button>
+                    ` : ''}
+                </td>
+            `;
+            tableBody.appendChild(row);
+        });
+        
+        // Show message if no vehicles found
+        if (allVehiclesSnap.empty) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td colspan="6" style="text-align: center; color: #666;">
+                    No vehicles found
+                </td>
+            `;
+            tableBody.appendChild(row);
+        }
+        
+    } catch (error) {
+        console.error('Error loading vehicles:', {
+            message: error.message,
+            code: error.code,
+            details: error.details || 'No additional details'
+        });
+        showAlert('fleetFormAlert', `Error loading vehicles: ${error.message}`);
+    }
+}
+       async function loadTrips() {
+    const tableBody = document.getElementById('tripsTable');
+    tableBody.innerHTML = '';
+
+    try {
+        const snapshot = await getDocs(query(collection(db, currentCompany, 'data', 'trips'), orderBy('tripDate', 'desc'), limit(50)));
+        
+        // Process each trip document
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+            let vehicleModel = 'N/A';
+            
+            // If there's a vehicle reference, fetch the vehicle model
+            if (data.vehicleId) {
+                try {
+                    const vehicleDoc = await getDoc(doc(db, currentCompany, 'data', 'fleet', data.vehicleId));
+                    if (vehicleDoc.exists()) {
+                        const vehicleData = vehicleDoc.data();
+                        vehicleModel = vehicleData.model || 'Unknown Model';
+                    }
+                } catch (vehicleError) {
+                    console.warn('Could not fetch vehicle data for:', data.vehicleId);
+                    vehicleModel = data.vehicleName || 'N/A'; // Fallback to existing vehicleName if available
+                }
+            } else if (data.vehicleName) {
+                // If no vehicleId but vehicleName exists, use that as fallback
+                vehicleModel = data.vehicleName;
+            }
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${data.tripId || 'N/A'}</td>
+                <td>${data.customerName || 'N/A'}</td>
+                <td>${data.tripLocation || 'N/A'}</td>
+                <td>${vehicleModel}</td>
+                <td>${data.driverName || 'N/A'}</td>
+                <td>${formatDate(data.tripDate) || 'N/A'}</td>
+                <td>
+                    ${isAdmin ? `
+                        <button class="btn-secondary" onclick="editRecord('trips', '${doc.id}')">Edit</button>
+                        <button class="btn-danger" onclick="deleteRecord('trips', '${doc.id}')">Delete</button>
+                    ` : ''}
+                </td>
+            `;
+            tableBody.appendChild(row);
+        }
+
+        // Populate the invoice trip select dropdown
+        const invoiceTripSelect = document.getElementById('invoiceTrip');
+        invoiceTripSelect.innerHTML = '<option value="">No Trip</option>';
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const option = document.createElement('option');
+            option.value = doc.id;
+            option.textContent = `${data.tripId || 'N/A'} - ${data.customerName || 'Unknown'}`;
+            invoiceTripSelect.appendChild(option);
+        });
+        
+        // Show message if no trips found
+        if (snapshot.empty) {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td colspan="7" style="text-align: center; color: #666;">
+                    No trips found
+                </td>
+            `;
+            tableBody.appendChild(row);
+        }
+        
+    } catch (error) {
+        console.error('Error loading trips:', {
+            message: error.message,
+            code: error.code,
+            details: error.details || 'No additional details'
+        });
+        showAlert('tripFormAlert', `Error loading trips: ${error.message}`);
+    }
+}
+
+        async function loadRentals() {
+            const tableBody = document.getElementById('rentalsTable');
+            tableBody.innerHTML = '';
+
+            try {
+                const snapshot = await getDocs(query(collection(db, currentCompany, 'data', 'rentals'), orderBy('rentalStartDate', 'desc'), limit(50)));
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${data.rentalId}</td>
+                        <td>${data.clientName}</td>
+                        <td>${data.vehicleName}</td>
+                        <td>${formatDate(data.rentalStartDate)}</td>
+                        <td>${formatDate(data.rentalEndDate)}</td>
+                        <td>${data.rentalStatus}</td>
+                        <td>
+                            ${isAdmin ? `
+                                <button class="btn-secondary" onclick="editRecord('rentals', '${doc.id}')">Edit</button>
+                                <button class="btn-danger" onclick="deleteRecord('rentals', '${doc.id}')">Delete</button>
+                            ` : ''}
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                const invoiceRentalSelect = document.getElementById('invoiceRental');
+                invoiceRentalSelect.innerHTML = '<option value="">No Rental</option>';
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = `${data.rentalId} - ${data.clientName}`;
+                    invoiceRentalSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading rentals:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('rentalFormAlert', `Error loading rentals: ${error.message}`);
+            }
+        }
+     async function loadInvoices() {
+    const tableBody = document.getElementById('invoicingTable');
+    tableBody.innerHTML = '';
+
+    try {
+        const snapshot = await getDocs(query(collection(db, currentCompany, 'data', 'invoicing'), orderBy('invoiceDate', 'desc'), limit(50)));
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            let row = document.createElement('tr'); // Declare row inside the loop
+            const formattedAmount = data.amount ? formatCurrency(data.amount) : formatCurrency(0);
+            const invoiceType = data.type || 'Not Specified';
+            row.innerHTML = `
+                <td>${data.invoiceId || 'N/A'}</td>
+                <td>${data.clientName || 'Unknown Client'}</td>
+                <td>${formattedAmount}</td>
+                <td>${invoiceType}</td>
+                <td>${formatDate(data.invoiceDate) || 'N/A'}</td>
+                <td>
+                    <button class="btn-secondary" id="downloadPDF-${doc.id}">Download PDF</button>
+                    ${isAdmin ? `
+                        <button class="btn-secondary" onclick="editRecord('invoicing', '${doc.id}')">Edit</button>
+                        <button class="btn-danger" onclick="deleteRecord('invoicing', '${doc.id}')">Delete</button>
+                    ` : ''}
+                </td>
+            `;
+            tableBody.appendChild(row);
+
+            // Attach event listener after row is added
+            document.getElementById(`downloadPDF-${doc.id}`).addEventListener('click', () => downloadInvoicePDF(doc.id));
+        });
+    } catch (error) {
+        console.error('Error loading invoices:', {
+            message: error.message,
+            code: error.code,
+            details: error.details || 'No additional details'
+        });
+        showAlert('invoiceFormAlert', `Error loading invoices: ${error.message}`);
+    }
+}
+
+        // PDF Download Function
+        async function downloadInvoicePDF(docId) {
+            const docRef = doc(db, currentCompany, 'data', 'invoicing', docId);
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+                showAlert('invoiceFormAlert', 'Invoice not found');
+                return;
+            }
+
+            const data = docSnap.data();
+
+            // Make sure jsPDF is available
+            const { jsPDF } = window.jspdf;
+
+            // Check if jsPDF is available
+            if (typeof window.jspdf === 'undefined') {
+                console.error('jsPDF library is not loaded');
+                showAlert('invoiceFormAlert', 'PDF library not properly loaded. Please refresh the page.');
+                return;
+            }
+
+            // Initialize jsPDF with A4 size
+            const pdfDoc = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            try {
+                // Load the appropriate letterhead PNG based on currentCompany
+                const letterheadMap = {
+                    'east-concord': 'https://i.ibb.co/S46hDnyT/east-concord-1.png',
+                    'sa-concord': 'https://i.ibb.co/sJ55xhyf/sa-concord-1.png',
+                    'north-concord': 'https://i.ibb.co/MkjQLTX9/north-concord-1.png'
+                };
+                const letterheadPath = letterheadMap[currentCompany];
+                if (!letterheadPath) {
+                    throw new Error('Letterhead not found for the selected company');
+                }
+
+                const letterheadImg = new Image();
+                letterheadImg.crossOrigin = 'anonymous';
+                letterheadImg.src = letterheadPath;
+                const img = await new Promise((resolve, reject) => {
+                    letterheadImg.onload = () => resolve(letterheadImg);
+                    letterheadImg.onerror = () => reject(new Error(`Failed to load letterhead image from ${letterheadPath}`));
+                });
+
+                // Add letterhead image to PDF
+                pdfDoc.addImage(img, 'PNG', 0, 0, 210, 297); // Full A4 size
+
+                // Set consistent font and size
+                pdfDoc.setFont('helvetica', 'normal');
+                pdfDoc.setFontSize(8);
+                pdfDoc.setTextColor(0, 0, 0);
+
+                // Define layout positions with proper margins
+                const leftMargin = 15;
+                const rightMargin = 15;
+                const pageWidth = 210; // A4 width in mm
+                const rightColumnX = 140;
+                const topMargin = 50; // Increased top margin for letterhead
+
+                // Company Header (Left side)
+                let yPos = topMargin;
+                pdfDoc.setFontSize(10);
+                pdfDoc.setFont('helvetica', 'bold');
+                pdfDoc.text('EAST CONCORD W.L.L', leftMargin, yPos);
+
+                pdfDoc.setFontSize(8);
+                pdfDoc.setFont('helvetica', 'normal');
+                yPos += 5;
+                pdfDoc.text('Flat/Shop No. 11, Building 471,', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('Road/Street 3513, MANAMA / UMM ALHASSAM,', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('Block 335, Bahrain', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('TRN: 220022179400002', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('E-Mail: concorddlinec@gmail.com', leftMargin, yPos);
+
+                // Invoice Header (Right side)
+                let rightYPos = topMargin;
+                pdfDoc.setFontSize(12);
+                pdfDoc.setFont('helvetica', 'bold');
+                pdfDoc.text('Tax Invoice', rightColumnX, rightYPos);
+
+                pdfDoc.setFontSize(8);
+                pdfDoc.setFont('helvetica', 'normal');
+                rightYPos += 8;
+                pdfDoc.text('Invoice No: ' + data.invoiceId, rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Date: ' + formatDate(data.invoiceDate), rightColumnX, rightYPos);
+
+                // Right side details
+                rightYPos += 6;
+                pdfDoc.text('Delivery Note: -', rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Mode/Term of payment: -', rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Suppliers Ref. invoice: -', rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Dated: -', rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Buyer\'s Order No: -', rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Delivery Note Date: -', rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Dispatch Document No: -', rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Destination: -', rightColumnX, rightYPos);
+                rightYPos += 4;
+                pdfDoc.text('Despatcher through: -', rightColumnX, rightYPos);
+
+                // Buyer details (Left side, below company info)
+                yPos += 8;
+                pdfDoc.setFont('helvetica', 'bold');
+                pdfDoc.text('Buyer', leftMargin, yPos);
+
+                pdfDoc.setFont('helvetica', 'normal');
+                yPos += 5;
+                pdfDoc.text('International Agencies Company Ltd', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('Building-4017, Road/Street-482,', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('Town: Manama, Block: 304', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('Country: Kingdom of Bahrain', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('TRN: 20000020900002', leftMargin, yPos);
+                yPos += 4;
+                pdfDoc.text('Place of supply: Bahrain', leftMargin, yPos);
+
+                // Table starts after both columns
+                const tableStartY = Math.max(yPos + 10, rightYPos + 10);
+
+                // Manual table creation (without autoTable plugin)
+                const drawTable = () => {
+                    const tableX = leftMargin;
+                    const tableWidth = pageWidth - leftMargin - rightMargin; // Full width minus margins (180mm)
+                    const rowHeight = 8;
+                    // Adjusted column widths to fit better and match the original invoice
+                    const colWidths = [15, 65, 18, 20, 20, 15, 15, 22]; // Total = 190, adjusted to fit
+
+                    let currentY = tableStartY;
+
+                    // Draw table border
+                    pdfDoc.setDrawColor(0, 0, 0);
+                    pdfDoc.setLineWidth(0.1);
+
+                    // Table headers
+                    const headers = ['Sl No', 'Particulars', 'Quantity', 'Rate', 'Amount', 'Vat %', 'Vat (BHD)', 'Total'];
+
+                    // Draw header row background
+                    pdfDoc.setFillColor(240, 240, 240);
+                    pdfDoc.rect(tableX, currentY, tableWidth, rowHeight, 'F');
+
+                    // Draw header borders and text
+                    let currentX = tableX;
+                    pdfDoc.setFontSize(7);
+                    pdfDoc.setFont('helvetica', 'bold');
+
+                    for (let i = 0; i < headers.length; i++) {
+                        // Draw cell border
+                        pdfDoc.rect(currentX, currentY, colWidths[i], rowHeight);
+
+                        // Add text
+                        const textX = currentX + colWidths[i] / 2;
+                        const textY = currentY + rowHeight / 2 + 1;
+                        pdfDoc.text(headers[i], textX, textY, { align: 'center' });
+
+                        currentX += colWidths[i];
+                    }
+
+                    currentY += rowHeight;
+
+                    // Data row
+                    const rowData = [
+                        '1',
+                        'Service Description',
+                        '1',
+                        '$0.00',
+                        '$0.00',
+                        '10%',
+                        '0.000',
+                        '0.0000'
+                    ];
+
+                    currentX = tableX;
+                    pdfDoc.setFont('helvetica', 'normal');
+
+                    for (let i = 0; i < rowData.length; i++) {
+                        // Draw cell border
+                        pdfDoc.rect(currentX, currentY, colWidths[i], rowHeight);
+
+                        // Add text with appropriate alignment
+                        let textX, align;
+                        if (i === 0 || i === 2 || i === 5) { // Center align for Sl No, Quantity, Vat %
+                            textX = currentX + colWidths[i] / 2;
+                            align = 'center';
+                        } else if (i === 1) { // Left align for Particulars
+                            textX = currentX + 2;
+                            align = 'left';
+                        } else { // Right align for Rate, Amount, Vat (BHD), Total
+                            textX = currentX + colWidths[i] - 2;
+                            align = 'right';
+                        }
+
+                        const textY = currentY + rowHeight / 2 + 1;
+                        pdfDoc.text(rowData[i], textX, textY, { align: align });
+
+                        currentX += colWidths[i];
+                    }
+
+                    currentY += rowHeight;
+
+                    // Total row
+                    const totalData = ['', 'Total', '', '', '$0.00', '0.000', '0.0000', ''];
+
+                    currentX = tableX;
+                    pdfDoc.setFont('helvetica', 'bold');
+
+                    for (let i = 0; i < totalData.length; i++) {
+                        // Draw cell border
+                        pdfDoc.rect(currentX, currentY, colWidths[i], rowHeight);
+
+                        // Add text with appropriate alignment
+                        let textX, align;
+                        if (i === 0 || i === 2 || i === 5) { // Center align
+                            textX = currentX + colWidths[i] / 2;
+                            align = 'center';
+                        } else if (i === 1) { // Left align for "Total"
+                            textX = currentX + 2;
+                            align = 'left';
+                        } else { // Right align
+                            textX = currentX + colWidths[i] - 2;
+                            align = 'right';
+                        }
+
+                        const textY = currentY + rowHeight / 2 + 1;
+                        if (totalData[i]) {
+                            pdfDoc.text(totalData[i], textX, textY, { align: align });
+                        }
+
+                        currentX += colWidths[i];
+                    }
+
+                    return currentY + rowHeight;
+                };
+
+                // Draw the table and get end position
+                const tableEndY = drawTable() + 10;
+
+                // Footer information
+                pdfDoc.setFontSize(8);
+                pdfDoc.setFont('helvetica', 'normal');
+                pdfDoc.text('E.&O.E', leftMargin, tableEndY);
+                pdfDoc.setFont('helvetica', 'bold');
+                pdfDoc.text('Amount chargeable (in words): -', leftMargin, tableEndY + 5);
+                pdfDoc.setFont('helvetica', 'normal');
+                pdfDoc.text('Remarks:', leftMargin, tableEndY + 10);
+                pdfDoc.text('Handling charge for', leftMargin, tableEndY + 15);
+                pdfDoc.text('Booked as invoice –Details attached', leftMargin, tableEndY + 20);
+
+                // Signature section
+                pdfDoc.text('For EAST CONCORD W.L.L', leftMargin, tableEndY + 30);
+                pdfDoc.text('Prepared by', leftMargin, tableEndY + 40);
+                pdfDoc.text('Verified by', leftMargin + 50, tableEndY + 40);
+                pdfDoc.text('Authorized Signatory', leftMargin + 100, tableEndY + 40);
+
+                // Generated timestamp (right aligned)
+                const timestamp = 'Generated on: ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+                pdfDoc.text(timestamp, pageWidth - rightMargin, tableEndY + 5, { align: 'right' });
+
+            } catch (error) {
+                console.error('Error generating PDF:', error);
+                showAlert('invoiceFormAlert', `Error generating PDF with letterhead: ${error.message}. Falling back to text-only PDF.`);
+
+                // Fallback: Simple text layout with proper margins
+                pdfDoc.setFontSize(8);
+                pdfDoc.setFont('helvetica', 'bold');
+                pdfDoc.text('Tax Invoice', 105, 60, { align: 'center' }); // Adjusted for letterhead
+
+                pdfDoc.setFont('helvetica', 'normal');
+                pdfDoc.text('EAST CONCORD W.L.L', leftMargin, 70);
+                pdfDoc.text('Flat/Shop No. 11, Building 471,', leftMargin, 75);
+                pdfDoc.text('Road/Street 3513, MANAMA / UMM ALHASSAM, Block 335, Bahrain', leftMargin, 80);
+                pdfDoc.text('TRN: 220022179400002', leftMargin, 85);
+                pdfDoc.text('Buyer: International Agencies Company Ltd', leftMargin, 95);
+                pdfDoc.text('Invoice No: ' + data.invoiceId, 150, 70);
+                pdfDoc.text('Date: ' + formatDate(data.invoiceDate), 150, 75);
+                pdfDoc.text('Amount: ' + formatCurrency(data.invoiceAmount), 150, 80);
+                pdfDoc.text('Generated on: ' + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' }), 105, 90, { align: 'center' });
+            }
+
+            // Force download
+            pdfDoc.save(`invoice_${data.invoiceId}.pdf`);
+        }
+
+        async function loadReports() {
+            const tableBody = document.getElementById('reportsTable');
+            tableBody.innerHTML = '';
+
+            try {
+                const tripsByClient = {};
+                const tripsSnapshot = await getDocs(collection(db, currentCompany, 'data', 'trips'));
+                tripsSnapshot.forEach(doc => {
+                    const data = doc.data();
+                    const clientName = data.customerName || 'Unknown Client';
+                    const tripAmount = data.tripAmount || 0;
+                    const tripDate = data.tripDate || new Date().toISOString();
+
+                    if (!tripsByClient[clientName]) {
+                        tripsByClient[clientName] = { count: 0, amount: 0, lastDate: null };
+                    }
+                    tripsByClient[clientName].count += 1;
+                    tripsByClient[clientName].amount += parseFloat(tripAmount);
+                    if (!tripsByClient[clientName].lastDate || new Date(tripDate) > new Date(tripsByClient[clientName].lastDate)) {
+                        tripsByClient[clientName].lastDate = tripDate;
+                    }
+                });
+
+                Object.keys(tripsByClient).forEach(client => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                <td>${client}</td>
+                <td>${tripsByClient[client].count}</td>
+                <td>${formatCurrency(tripsByClient[client].amount)}</td>
+                <td>${formatDate(tripsByClient[client].lastDate) || 'N/A'}</td>
+            `;
+                    tableBody.appendChild(row);
+                });
+            } catch (error) {
+                console.error('Error loading reports:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('auditFormAlert', `Error loading reports: ${error.message}`);
+            }
+        }
+
+        async function loadVAT() {
+            let outputVATTotal = 0, inputVATTotal = 0;
+            const tableBody = document.getElementById('vatTable');
+            tableBody.innerHTML = '';
+
+            try {
+                const snapshot = await getDocs(query(collection(db, currentCompany, 'data', 'vat'), orderBy('vatDate', 'desc'), limit(50)));
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    if (data.vatType === 'Output VAT') outputVATTotal += data.vatAmount || 0;
+                    else if (data.vatType === 'Input VAT') inputVATTotal += data.vatAmount || 0;
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${formatDate(data.vatDate)}</td>
+                        <td>${data.vatType}</td>
+                        <td>${formatCurrency(data.vatAmount)}</td>
+                        <td>${data.vatDescription}</td>
+                        <td>
+                            ${isAdmin ? `
+                                <button class="btn-secondary" onclick="editRecord('vat', '${doc.id}')">Edit</button>
+                                <button class="btn-danger" onclick="deleteRecord('vat', '${doc.id}')">Delete</button>
+                            ` : ''}
+                        </td>
+                    `;
+                    tableBody.appendChild(row);
+                });
+
+                document.getElementById('outputVATTotal').textContent = formatCurrency(outputVATTotal);
+                document.getElementById('inputVATTotal').textContent = formatCurrency(inputVATTotal);
+                document.getElementById('netVATTotal').textContent = formatCurrency(outputVATTotal - inputVATTotal);
+            } catch (error) {
+                console.error('Error loading VAT:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('vatFormAlert', `Error loading VAT: ${error.message}`);
+            }
+        }
+
+        async function loadTripManagement() {
+            const tableBody = document.getElementById('allTripsTable');
+            tableBody.innerHTML = '';
+
+            if (!isAdmin) return;
+
+            try {
+                const companies = ['east-concord', 'sa-concord', 'north-concord'];
+                for (const company of companies) {
+                    const snapshot = await getDocs(query(collection(db, company, 'data', 'trips'), orderBy('tripDate', 'desc'), limit(50)));
+                    snapshot.forEach(doc => {
+                        const data = doc.data();
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${data.tripId}</td>
+                            <td>${company}</td>
+                            <td>${data.customerName}</td>
+                            <td>${data.tripLocation}</td>
+                            <td>${data.vehicleName}</td>
+                            <td>${data.driverName}</td>
+                            <td>${formatDate(data.tripDate)}</td>
+                            <td>${data.tripStatus || 'Completed'}</td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading trip management:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('tripManagementAlert', `Error loading trip management: ${error.message}`);
+            }
+        }
+
+        async function loadPageData(pageId) {
+            switch (pageId) {
+                case 'overview':
+                    await loadDashboardStats();
+                    break;
+                case 'tripManagement':
+                    await loadTripManagement();
+                    break;
+                case 'trips':
+                    await loadTrips();
+                    await loadClients();
+                    await loadEmployees();
+                    await loadVehicles();
+                    break;
+                case 'rentals':
+                    await loadRentals();
+                    await loadClients();
+                    await loadEmployees();
+                    await loadVehicles();
+                    break;
+                case 'fleet':
+                    await loadVehicles();
+                    break;
+                case 'invoicing':
+                    await loadInvoices();
+                    await loadClients();
+                    await loadTrips();
+                    await loadRentals();
+                    break;
+                case 'clients':
+                    await loadClients();
+                    break;
+                case 'employees':
+                    await loadEmployees();
+                    break;
+                case 'payroll':
+                    await loadPayroll();
+                    await loadEmployees();
+                    break;
+                case 'planning':
+                    await loadPlanning();
+                    await loadEmployees();
+                    break;
+                case 'reports':
+                    await loadReports();
+                    await loadClients();
+                    await loadTrips();
+                    break;
+                case 'vat':
+                    await loadVAT();
+                    break;
+            }
+        }
+
+        // Form submission handlers
+        document.getElementById('tripForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const customerId = document.getElementById('tripCustomer').value;
+    const customerDoc = await getDoc(doc(db, currentCompany, 'data', 'clients', customerId));
+    const customerData = customerDoc.data();
+    const numberOfTrips = document.getElementById('tripNumberOfTrips').value;
+    const location = document.getElementById('tripLocation').value;
+    const vehicleId = document.getElementById('tripVehicle').value;
+    const vehicleDoc = await getDoc(doc(db, currentCompany, 'data', 'fleet', vehicleId));
+    const vehicleData = vehicleDoc.data();
+    const driverId = document.getElementById('tripDriver').value;
+    const driverDoc = await getDoc(doc(db, currentCompany, 'data', 'employees', driverId));
+    const driverData = driverDoc.data();
+    const date = document.getElementById('tripDate').value;
+    const remarks = document.getElementById('tripRemarks').value;
+
+    try {
+        const tripId = generateID('TRIP');
+        await addDoc(collection(db, currentCompany, 'data', 'trips'), {
+            tripId,
+            customerName: customerData.clientCompanyName,
+            customerId,
+            numberOfTrips: parseInt(numberOfTrips),
+            tripLocation: location,
+            // Fixed: Using correct field names from your fleet data structure
+            vehicleName: `${vehicleData.model || 'Unknown Model'} (${vehicleData.plateNumber || 'No Plate'})`,
+            vehicleId, // This stores the Firestore document ID
+            vehicleActualId: vehicleData.vehicleId, // This stores the actual vehicle ID like "VEH566198648"
+            driverName: driverData.employeeFullName,
+            driverId,
+            tripDate: date,
+            remarks,
+            createdAt: new Date().toISOString(),
+            tripAmount: 0,
+            tripStatus: 'Scheduled'
+        });
+        showAlert('tripFormAlert', 'Trip added successfully!', 'success');
+        document.getElementById('tripForm').reset();
+        await loadTrips();
+    } catch (error) {
+        console.error('Error adding trip:', {
+            message: error.message,
+            code: error.code,
+            details: error.details || 'No additional details'
+        });
+        showAlert('tripFormAlert', `Error adding trip: ${error.message}`);
+    }
+});
+        document.getElementById('rentalForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const startDate = document.getElementById('rentalStartDate').value;
+            const endDate = document.getElementById('rentalEndDate').value;
+            const clientId = document.getElementById('rentalClient').value;
+            const clientDoc = await getDoc(doc(db, currentCompany, 'data', 'clients', clientId));
+            const clientData = clientDoc.data();
+            const vehicleId = document.getElementById('rentalVehicle').value;
+            const vehicleDoc = await getDoc(doc(db, currentCompany, 'data', 'fleet', vehicleId));
+            const vehicleData = vehicleDoc.data();
+            const driverId = document.getElementById('rentalDriver').value || null;
+            const driverDoc = driverId ? await getDoc(doc(db, currentCompany, 'data', 'employees', driverId)) : { data: () => ({ employeeFullName: 'No Driver' }) };
+            const driverData = driverDoc.data();
+            const rate = document.getElementById('rentalRate').value;
+            const vatExcluded = document.getElementById('rentalVATExcluded').checked;
+            const fuelIncluded = document.getElementById('rentalFuelIncluded').checked;
+            const status = document.getElementById('rentalStatus').value;
+            const maintenanceNotes = document.getElementById('rentalMaintenanceNotes').value;
+
+            try {
+                const rentalId = generateID('RENT');
+                await addDoc(collection(db, currentCompany, 'data', 'rentals'), {
+                    rentalId,
+                    startDate,
+                    endDate,
+                    clientName: clientData.clientCompanyName,
+                    clientId,
+                    vehicleName: `${vehicleData.vehicleModel} (${vehicleData.vehiclePlateNumber})`,
+                    vehicleId,
+                    driverName: driverData.employeeFullName,
+                    driverId,
+                    rate: parseFloat(rate),
+                    vatExcluded,
+                    fuelIncluded,
+                    status,
+                    maintenanceNotes,
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('rentalFormAlert', 'Rental added successfully!', 'success');
+                document.getElementById('rentalForm').reset();
+                await loadRentals();
+            } catch (error) {
+                console.error('Error adding rental:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('rentalFormAlert', `Error adding rental: ${error.message}`);
+            }
+        });
+
+        document.getElementById('fleetForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const sadeemNo = document.getElementById('vehicleSadeemNo').value;
+            const plateNumber = document.getElementById('vehiclePlateNumber').value;
+            const crName = document.getElementById('vehicleCRName').value;
+            const crNo = document.getElementById('vehicleCRNo').value;
+            const type = document.getElementById('vehicleType').value;
+            const model = document.getElementById('vehicleModel').value;
+            const manufactureYear = document.getElementById('vehicleManufactureYear').value;
+            const loadCapacity = document.getElementById('vehicleLoadCapacity').value;
+            const registrationExpiry = document.getElementById('vehicleRegistrationExpiry').value;
+            const insuranceExpiry = document.getElementById('vehicleInsuranceExpiry').value;
+            const mulkiyaExpiry = document.getElementById('vehicleMulkiyaExpiry').value;
+            const transportType = document.getElementById('vehicleTransportType').value;
+            const maintenanceSchedule = document.getElementById('vehicleMaintenanceSchedule').value;
+            const odometerReading = document.getElementById('vehicleOdometerReading').value;
+            const fuelConsumption = document.getElementById('vehicleFuelConsumption').value;
+            const status = document.getElementById('vehicleStatus').value;
+
+            try {
+                const vehicleId = generateID('VEH');
+                await addDoc(collection(db, currentCompany, 'data', 'fleet'), {
+                    vehicleId,
+                    sadeemNo,
+                    plateNumber,
+                    crName,
+                    crNo,
+                    type,
+                    model,
+                    manufactureYear: parseInt(manufactureYear),
+                    loadCapacity: parseFloat(loadCapacity),
+                    registrationExpiry,
+                    insuranceExpiry,
+                    mulkiyaExpiry,
+                    transportType,
+                    maintenanceSchedule,
+                    odometerReading: parseFloat(odometerReading),
+                    fuelConsumption: fuelConsumption ? parseFloat(fuelConsumption) : null,
+                    status,
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('fleetFormAlert', 'Vehicle added successfully!', 'success');
+                document.getElementById('fleetForm').reset();
+                await loadVehicles();
+            } catch (error) {
+                console.error('Error adding vehicle:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('fleetFormAlert', `Error adding vehicle: ${error.message}`);
+            }
+        });
+
+        document.getElementById('invoiceForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const clientId = document.getElementById('invoiceClient').value;
+            const clientDoc = await getDoc(doc(db, currentCompany, 'data', 'clients', clientId));
+            const clientData = clientDoc.data();
+            const tripId = document.getElementById('invoiceTrip').value || null;
+            const rentalId = document.getElementById('invoiceRental').value || null;
+            const amount = document.getElementById('invoiceAmount').value;
+            const serviceFee = document.getElementById('invoiceServiceFee').value;
+            const taxRate = document.getElementById('invoiceTaxRate').value;
+            const vatIncluded = document.getElementById('invoiceVATIncluded').checked;
+            const type = document.getElementById('invoiceType').value;
+
+            try {
+                const invoiceId = generateID('INV');
+                await addDoc(collection(db, currentCompany, 'data', 'invoicing'), {
+                    invoiceId,
+                    clientName: clientData.clientCompanyName,
+                    clientId,
+                    tripId,
+                    rentalId,
+                    amount: parseFloat(amount),
+                    serviceFee: parseFloat(serviceFee),
+                    taxRate: parseFloat(taxRate),
+                    vatIncluded,
+                    type,
+                    invoiceDate: new Date().toISOString(),
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('invoiceFormAlert', 'Invoice/Quote added successfully!', 'success');
+                document.getElementById('invoiceForm').reset();
+                await loadInvoices();
+            } catch (error) {
+                console.error('Error adding invoice:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('invoiceFormAlert', `Error adding invoice: ${error.message}`);
+            }
+        });
+
+        document.getElementById('clientForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const companyName = document.getElementById('clientCompanyName').value;
+            const contactPerson = document.getElementById('clientContactPerson').value;
+            const mobile = document.getElementById('clientMobile').value;
+            const email = document.getElementById('clientEmail').value;
+            const address = document.getElementById('clientAddress').value;
+            const region = document.getElementById('clientRegion').value;
+            const priority = document.getElementById('clientPriority').value;
+            const type = document.getElementById('clientType').value;
+            const servicesSubscribed = document.getElementById('clientServicesSubscribed').value;
+            const status = document.getElementById('clientStatus').value;
+
+            try {
+                const clientId = generateID('CLI');
+                await addDoc(collection(db, currentCompany, 'data', 'clients'), {
+                    clientId,
+                    clientCompanyName: companyName,
+                    clientContactPerson: contactPerson,
+                    clientMobile: mobile,
+                    clientEmail: email,
+                    clientAddress: address,
+                    clientRegion: region,
+                    clientPriority: priority,
+                    clientType: type,
+                    clientServicesSubscribed: servicesSubscribed,
+                    clientStatus: status,
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('clientFormAlert', 'Client added successfully!', 'success');
+                document.getElementById('clientForm').reset();
+                await loadClients();
+            } catch (error) {
+                console.error('Error adding client:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('clientFormAlert', `Error adding client: ${error.message}`);
+            }
+        });
+
+        document.getElementById('employeeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fullName = document.getElementById('employeeFullName').value;
+            const nationality = document.getElementById('employeeNationality').value;
+            const cprNumber = document.getElementById('employeeCPRNumber').value;
+            const jobTitle = document.getElementById('employeeJobTitle').value;
+            const joiningDate = document.getElementById('employeeJoiningDate').value;
+            const mobile = document.getElementById('employeeMobile').value;
+            const department = document.getElementById('employeeDepartment').value;
+            const shift = document.getElementById('employeeShift').value;
+
+            try {
+                const employeeId = generateID('EMP');
+                await addDoc(collection(db, currentCompany, 'data', 'employees'), {
+                    employeeId,
+                    employeeFullName: fullName,
+                    employeeNationality: nationality,
+                    employeeCPRNumber: cprNumber,
+                    employeeJobTitle: jobTitle,
+                    employeeJoiningDate: joiningDate,
+                    employeeMobile: mobile,
+                    employeeDepartment: department,
+                    employeeShift: shift,
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('employeeFormAlert', 'Employee added successfully!', 'success');
+                document.getElementById('employeeForm').reset();
+                await loadEmployees();
+            } catch (error) {
+                console.error('Error adding employee:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('employeeFormAlert', `Error adding employee: ${error.message}`);
+            }
+        });
+
+        document.getElementById('payrollForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const employeeId = document.getElementById('payrollEmployee').value;
+            const employeeDoc = await getDoc(doc(db, currentCompany, 'data', 'employees', employeeId));
+            const employeeData = employeeDoc.data();
+            const period = document.getElementById('payrollPeriod').value;
+            const baseSalary = document.getElementById('payrollBaseSalary').value;
+            const tripBonus = document.getElementById('payrollTripBonus').value;
+            const rentalCommission = document.getElementById('payrollRentalCommission').value;
+            const deductions = document.getElementById('payrollDeductions').value;
+            const overtime = document.getElementById('payrollOvertime').value;
+            const paymentStatus = document.getElementById('payrollPaymentStatus').value;
+
+            try {
+                const payrollId = generateID('PAY');
+                await addDoc(collection(db, currentCompany, 'data', 'payroll'), {
+                    payrollId,
+                    employeeName: employeeData.employeeFullName,
+                    employeeId,
+                    payrollPeriod: period,
+                    payrollBaseSalary: parseFloat(baseSalary),
+                    payrollTripBonus: parseFloat(tripBonus),
+                    payrollRentalCommission: parseFloat(rentalCommission),
+                    payrollDeductions: parseFloat(deductions),
+                    payrollOvertime: parseFloat(overtime),
+                    payrollPaymentStatus: paymentStatus,
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('payrollFormAlert', 'Payroll added successfully!', 'success');
+                document.getElementById('payrollForm').reset();
+                await loadPayroll();
+            } catch (error) {
+                console.error('Error adding payroll:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('payrollFormAlert', `Error adding payroll: ${error.message}`);
+            }
+        });
+
+        document.getElementById('planningForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const employeeId = document.getElementById('planEmployee').value;
+            const employeeDoc = await getDoc(doc(db, currentCompany, 'data', 'employees', employeeId));
+            const employeeData = employeeDoc.data();
+            const type = document.getElementById('planType').value;
+            const startDate = document.getElementById('planStartDate').value;
+            const endDate = document.getElementById('planEndDate').value;
+            const status = document.getElementById('planStatus').value;
+            const notes = document.getElementById('planNotes').value;
+
+            try {
+                const planId = generateID('PLAN');
+                await addDoc(collection(db, currentCompany, 'data', 'planning'), {
+                    planId,
+                    employeeName: employeeData.employeeFullName,
+                    employeeId,
+                    planType: type,
+                    planStartDate: startDate,
+                    planEndDate: endDate,
+                    planStatus: status,
+                    planNotes: notes,
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('planningFormAlert', 'Plan added successfully!', 'success');
+                document.getElementById('planningForm').reset();
+                await loadPlanning();
+            } catch (error) {
+                console.error('Error adding plan:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('planningFormAlert', `Error adding plan: ${error.message}`);
+            }
+        });
+
+        document.getElementById('auditForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const period = document.getElementById('auditPeriod').value;
+            const openingBalance = document.getElementById('auditOpeningBalance').value;
+            const closingBalance = document.getElementById('auditClosingBalance').value;
+
+            try {
+                const auditId = generateID('AUD');
+                await addDoc(collection(db, currentCompany, 'data', 'reports'), {
+                    auditId,
+                    auditPeriod: period,
+                    auditOpeningBalance: parseFloat(openingBalance),
+                    auditClosingBalance: parseFloat(closingBalance),
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('auditFormAlert', 'Balance added successfully!', 'success');
+                document.getElementById('auditForm').reset();
+                await loadReports();
+            } catch (error) {
+                console.error('Error adding audit balance:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('auditFormAlert', `Error adding balance: ${error.message}`);
+            }
+        });
+
+        document.getElementById('vatForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const type = document.getElementById('vatType').value;
+            const amount = document.getElementById('vatAmount').value;
+            const date = document.getElementById('vatDate').value;
+            const description = document.getElementById('vatDescription').value;
+
+            try {
+                const vatId = generateID('VAT');
+                await addDoc(collection(db, currentCompany, 'data', 'vat'), {
+                    vatId,
+                    vatType: type,
+                    vatAmount: parseFloat(amount),
+                    vatDate: date,
+                    vatDescription: description,
+                    createdAt: new Date().toISOString()
+                });
+                showAlert('vatFormAlert', 'VAT entry added successfully!', 'success');
+                document.getElementById('vatForm').reset();
+                await loadVAT();
+            } catch (error) {
+                console.error('Error adding VAT entry:', {
+                    message: error.message,
+                    code: error.code,
+                    details: error.details || 'No additional details'
+                });
+                showAlert('vatFormAlert', `Error adding VAT entry: ${error.message}`);
+            }
+        });
+
+        // CRUD operations
+        window.editRecord = async (collectionName, docId) => {
+            if (!isAdmin) return;
+
+            const docRef = doc(db, currentCompany, 'data', collectionName, docId);
+            const docSnap = await getDoc(docRef);
+            if (!docSnap.exists()) {
+                showAlert(`${collectionName}FormAlert`, 'Document not found');
+                return;
+            }
+
+            const data = docSnap.data();
+            const form = document.getElementById(`${collectionName}Form`);
+            const fields = form.querySelectorAll('input, select, textarea');
+            fields.forEach(field => {
+                const fieldName = field.id.replace(`${collectionName}`, '').toLowerCase();
+                if (data[fieldName] !== undefined) {
+                    if (field.type === 'checkbox') field.checked = data[fieldName];
+                    else if (field.type === 'number') field.value = data[fieldName] || 0;
+                    else field.value = data[fieldName] || '';
+                }
+            });
+
+            form.querySelector('button[type="submit"]').textContent = 'Update';
+            form.dataset.editingId = docId;
+
+            showPage(collectionName);
+        };
+
+        window.deleteRecord = async (collectionName, docId) => {
+            if (!isAdmin) return;
+
+            if (confirm('Are you sure you want to delete this record?')) {
+                try {
+                    await deleteDoc(doc(db, currentCompany, 'data', collectionName, docId));
+                    showAlert(`${collectionName}FormAlert`, 'Record deleted successfully!', 'success');
+                    await loadPageData(collectionName);
+                } catch (error) {
+                    console.error('Error deleting record:', {
+                        message: error.message,
+                        code: error.code,
+                        details: error.details || 'No additional details'
+                    });
+                    showAlert(`${collectionName}FormAlert`, `Error deleting record: ${error.message}`);
+                }
+            }
+        };
+
+        // Export functions
+        window.exportTripsCSV = () => {
+            const table = document.getElementById('tripsTable');
+            const rows = table.getElementsByTagName('tr');
+            let csvContent = 'data:text/csv;charset=utf-8,';
+            csvContent += 'Trip ID,Customer,Location,Vehicle,Driver,Date\n';
+
+            for (let i = 0; i < rows.length; i++) {
+                const cols = rows[i].getElementsByTagName('td');
+                if (cols.length > 0) {
+                    const rowData = Array.from(cols).map(col => `"${col.textContent.trim()}"`).join(',');
+                    csvContent += rowData + '\n';
+                }
+            }
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', 'trips_report.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        window.exportVATReport = () => {
+            const table = document.getElementById('vatTable');
+            const rows = table.getElementsByTagName('tr');
+            let csvContent = 'data:text/csv;charset=utf-8,';
+            csvContent += 'Date,Type,Amount,Description\n';
+
+            for (let i = 0; i < rows.length; i++) {
+                const cols = rows[i].getElementsByTagName('td');
+                if (cols.length > 0) {
+                    const rowData = Array.from(cols).slice(0, 4).map(col => `"${col.textContent.trim()}"`).join(',');
+                    csvContent += rowData + '\n';
+                }
+            }
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement('a');
+            link.setAttribute('href', encodedUri);
+            link.setAttribute('download', 'vat_report.csv');
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        };
+
+        // Initialize
+        showLogin();
+    </script>
+</body>
+
+</html>
